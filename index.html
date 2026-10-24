@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tower Destiny Survive - Crate Defense</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;600;700;800&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="game-app">
+    <!-- Top HUD Bar -->
+    <header id="top-bar">
+      <div class="logo-zone">
+        <span class="game-icon">🛡️</span>
+        <div class="title-wrap">
+          <span class="brand-title">CRATE DEFENDER</span>
+          <span class="brand-subtitle">Tower Destiny Survive</span>
+        </div>
+      </div>
+      
+      <div class="stats-zone">
+        <div class="stat-badge coins-badge">
+          <span class="coin-icon">🪙</span>
+          <span id="coin-display" class="stat-value">0</span>
+          <span class="stat-label">Coins</span>
+        </div>
+
+        <div class="stat-badge wave-badge">
+          <span class="wave-icon">🌊</span>
+          <div>
+            <span class="stat-label">WAVE</span>
+            <span id="wave-display" class="stat-value">1</span>
+          </div>
+        </div>
+
+        <div class="stat-badge hp-badge">
+          <span class="hp-icon">❤️</span>
+          <div class="hp-bar-outer">
+            <div id="tower-hp-bar" class="hp-bar-inner" style="width: 100%;"></div>
+            <span id="tower-hp-text" class="hp-text">500 / 500</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="controls-zone">
+        <button id="speed-btn" class="hud-btn" title="Toggle Speed">1x ⏩</button>
+        <button id="pause-btn" class="hud-btn" title="Pause Game">⏸️</button>
+        <button id="sound-btn" class="hud-btn" title="Sound Mute/Unmute">🔊</button>
+      </div>
+    </header>
+
+    <!-- Main View: Canvas + Right Armory/Upgrade Panel -->
+    <main id="main-content">
+      <!-- Game Canvas Container -->
+      <div id="canvas-container">
+        <canvas id="gameCanvas" width="960" height="580"></canvas>
+        
+        <!-- Overlay banner for wave clear / game over -->
+        <div id="overlay-banner" class="hidden">
+          <h2 id="overlay-title">WAVE COMPLETE!</h2>
+          <p id="overlay-sub">Get ready for incoming enemies...</p>
+          <button id="overlay-action-btn" class="glow-button">NEXT WAVE</button>
+        </div>
+
+        <!-- Floating damage / floating text host -->
+        <div id="floating-text-container"></div>
+      </div>
+
+      <!-- Armory & Upgrade Sidebar -->
+      <aside id="armory-panel">
+        <div class="panel-header">
+          <h3>📦 5 CRATE WEAPON SLOTS</h3>
+          <p class="panel-desc">Click a slot to equip, replace, or upgrade weapons</p>
+        </div>
+
+        <!-- The 5 Slot Selector Buttons -->
+        <div class="crate-slots-row" id="crate-slots-container">
+          <!-- 5 crate cards rendered by JS -->
+        </div>
+
+        <!-- Selected Slot Inspector & Weapon Shop Tabs -->
+        <div class="slot-inspector" id="slot-inspector">
+          <div class="inspector-header">
+            <span id="inspect-slot-num" class="slot-tag">SLOT 1</span>
+            <span id="inspect-weapon-name" class="weapon-title">Empty Slot</span>
+            <button id="sell-weapon-btn" class="danger-btn hidden">Sell (70%)</button>
+          </div>
+
+          <!-- Current Weapon Details & Upgrade Button -->
+          <div id="current-weapon-info" class="card-glass hidden">
+            <div class="weapon-icon-large" id="inspect-weapon-icon">🔫</div>
+            <div class="weapon-details-text">
+              <div class="upgrade-stars" id="inspect-stars">⭐⭐⭐⭐⭐</div>
+              <div class="stats-mini-grid" id="inspect-stats-grid">
+                <!-- Dynamic stat rows -->
+              </div>
+            </div>
+            <button id="upgrade-weapon-btn" class="upgrade-btn">
+              <span>UPGRADE</span>
+              <span id="upgrade-cost-tag" class="cost-tag">🪙 25</span>
+            </button>
+          </div>
+
+          <!-- Weapon Shop Arsenal List -->
+          <div class="shop-section">
+            <div class="shop-tabs">
+              <button class="shop-tab active" data-cat="all">ALL</button>
+              <button class="shop-tab" data-cat="gun">GUNS</button>
+              <button class="shop-tab" data-cat="godly-gun">GODLY GUNS</button>
+              <button class="shop-tab" data-cat="melee">CLOSE RANGE</button>
+              <button class="shop-tab" data-cat="godly-melee">GODLY MELEE</button>
+            </div>
+
+            <div class="weapon-store-list" id="weapon-store-list">
+              <!-- Rendered items: Turret, AK-47, Minigun, Energy Railgun, RPG, Flamethrower, Chainsaw, Energy Blade -->
+            </div>
+          </div>
+        </div>
+      </aside>
+    </main>
+
+    <!-- Bottom Notification Bar -->
+    <footer id="footer-bar">
+      <span class="hint-text">💡 Tip: Equip Close Range weapons like Chainsaw or Energy Blade to shred zombies that reach your crates!</span>
+      <span class="credits">Tower Destiny Survive &bull; Antigravity Edition</span>
+    </footer>
+  </div>
+
+  <script src="audio.js"></script>
+  <script src="weapons.js"></script>
+  <script src="game.js"></script>
+</body>
+</html>

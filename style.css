@@ -1,0 +1,696 @@
+:root {
+  --bg-dark: #0a0c14;
+  --bg-card: rgba(22, 27, 44, 0.85);
+  --bg-card-hover: rgba(35, 43, 70, 0.95);
+  --border-glow: #2a3b66;
+  --border-active: #4deeea;
+  
+  --accent-cyan: #00f3ff;
+  --accent-gold: #ffb703;
+  --accent-red: #ff3366;
+  --accent-green: #00ff88;
+  --accent-purple: #9d4edd;
+  --accent-godly: linear-gradient(135deg, #ff007f, #7928ca, #00f3ff);
+  
+  --text-main: #f0f4fc;
+  --text-muted: #8ca0ba;
+  
+  --crate-wood-1: #b87333;
+  --crate-wood-2: #80471c;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  user-select: none;
+}
+
+body {
+  background-color: var(--bg-dark);
+  color: var(--text-main);
+  font-family: 'Rajdhani', sans-serif;
+  overflow: hidden;
+  height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+#game-app {
+  width: 100vw;
+  height: 100vh;
+  max-width: 1600px;
+  max-height: 960px;
+  display: flex;
+  flex-direction: column;
+  background: radial-gradient(circle at 50% 20%, #151a2e 0%, #080a11 100%);
+  border: 1px solid rgba(0, 243, 255, 0.15);
+  box-shadow: 0 0 50px rgba(0, 0, 0, 0.9);
+  position: relative;
+}
+
+/* TOP HUD */
+#top-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 24px;
+  background: rgba(10, 12, 20, 0.9);
+  backdrop-filter: blur(10px);
+  border-bottom: 2px solid rgba(0, 243, 255, 0.2);
+  height: 64px;
+  z-index: 10;
+}
+
+.logo-zone {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.game-icon {
+  font-size: 28px;
+  filter: drop-shadow(0 0 8px var(--accent-cyan));
+}
+
+.brand-title {
+  font-family: 'Chakra Petch', sans-serif;
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: 2px;
+  background: linear-gradient(90deg, #00f3ff, #ffb703);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  display: block;
+  line-height: 1.1;
+}
+
+.brand-subtitle {
+  font-size: 11px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  letter-spacing: 1.5px;
+}
+
+.stats-zone {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.stat-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(25, 32, 53, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 6px 14px;
+  border-radius: 8px;
+  box-shadow: inset 0 0 10px rgba(0,0,0,0.5);
+}
+
+.stat-badge.coins-badge {
+  border-color: rgba(255, 183, 3, 0.4);
+}
+
+.coins-badge .coin-icon {
+  font-size: 20px;
+  animation: pulseCoin 2s infinite ease-in-out;
+}
+
+@keyframes pulseCoin {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.15) rotate(10deg); }
+}
+
+.stat-value {
+  font-family: 'Chakra Petch', sans-serif;
+  font-size: 20px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.coins-badge .stat-value {
+  color: #ffd166;
+}
+
+.stat-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.hp-badge {
+  min-width: 200px;
+}
+
+.hp-bar-outer {
+  position: relative;
+  width: 130px;
+  height: 16px;
+  background: rgba(0, 0, 0, 0.6);
+  border-radius: 4px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 51, 102, 0.3);
+}
+
+.hp-bar-inner {
+  height: 100%;
+  background: linear-gradient(90deg, #ff3366, #ff758c);
+  transition: width 0.25s ease;
+  box-shadow: 0 0 10px rgba(255, 51, 102, 0.6);
+}
+
+.hp-text {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  font-size: 10px;
+  font-weight: 700;
+  text-align: center;
+  line-height: 16px;
+  color: #fff;
+  text-shadow: 1px 1px 2px #000;
+}
+
+.controls-zone {
+  display: flex;
+  gap: 8px;
+}
+
+.hud-btn {
+  background: rgba(30, 40, 68, 0.8);
+  border: 1px solid rgba(0, 243, 255, 0.3);
+  color: #fff;
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-family: 'Chakra Petch', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.hud-btn:hover {
+  background: rgba(0, 243, 255, 0.2);
+  border-color: var(--accent-cyan);
+  transform: translateY(-1px);
+}
+
+/* MAIN VIEW LAYOUT */
+#main-content {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+  position: relative;
+}
+
+/* CANVAS ZONE */
+#canvas-container {
+  flex: 1;
+  position: relative;
+  background: #0d111c;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  overflow: hidden;
+}
+
+#gameCanvas {
+  display: block;
+  background: transparent;
+  box-shadow: 0 0 20px rgba(0,0,0,0.8);
+  cursor: crosshair;
+}
+
+/* OVERLAY BANNER */
+#overlay-banner {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(12, 16, 28, 0.92);
+  border: 2px solid var(--accent-cyan);
+  border-radius: 14px;
+  padding: 30px 50px;
+  text-align: center;
+  box-shadow: 0 0 40px rgba(0, 243, 255, 0.4), inset 0 0 20px rgba(0, 243, 255, 0.1);
+  z-index: 100;
+  backdrop-filter: blur(12px);
+  animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes popIn {
+  from { transform: translate(-50%, -50%) scale(0.8); opacity: 0; }
+  to { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+}
+
+#overlay-banner.hidden {
+  display: none;
+}
+
+#overlay-title {
+  font-family: 'Chakra Petch', sans-serif;
+  font-size: 32px;
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: 2px;
+  margin-bottom: 8px;
+}
+
+#overlay-sub {
+  color: var(--text-muted);
+  font-size: 15px;
+  margin-bottom: 20px;
+}
+
+.glow-button {
+  background: linear-gradient(135deg, #00f3ff, #0077ff);
+  color: #050b14;
+  font-family: 'Chakra Petch', sans-serif;
+  font-size: 16px;
+  font-weight: 800;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 28px;
+  cursor: pointer;
+  letter-spacing: 1px;
+  box-shadow: 0 0 20px rgba(0, 243, 255, 0.6);
+  transition: all 0.2s;
+}
+
+.glow-button:hover {
+  transform: scale(1.05);
+  box-shadow: 0 0 30px rgba(0, 243, 255, 0.9);
+}
+
+/* SIDEBAR / ARMORY PANEL */
+#armory-panel {
+  width: 440px;
+  background: rgba(14, 18, 30, 0.95);
+  border-left: 2px solid rgba(0, 243, 255, 0.15);
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  gap: 12px;
+  overflow-y: auto;
+}
+
+.panel-header h3 {
+  font-family: 'Chakra Petch', sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+  color: #00f3ff;
+  letter-spacing: 1px;
+}
+
+.panel-desc {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* CRATE SLOTS SELECTOR */
+.crate-slots-row {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+}
+
+.crate-slot-card {
+  background: rgba(25, 34, 58, 0.6);
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 8px 4px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  position: relative;
+}
+
+.crate-slot-card:hover {
+  border-color: rgba(0, 243, 255, 0.5);
+  background: rgba(35, 48, 80, 0.8);
+}
+
+.crate-slot-card.active {
+  border-color: var(--accent-cyan);
+  box-shadow: 0 0 15px rgba(0, 243, 255, 0.4);
+  background: rgba(0, 243, 255, 0.12);
+}
+
+.slot-index-badge {
+  position: absolute;
+  top: 2px;
+  left: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.slot-crate-icon {
+  font-size: 22px;
+  margin-top: 4px;
+}
+
+.slot-weapon-title {
+  font-size: 10px;
+  font-weight: 700;
+  text-align: center;
+  max-width: 65px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 4px;
+}
+
+.slot-stars-mini {
+  font-size: 8px;
+  color: #ffb703;
+}
+
+/* SLOT INSPECTOR */
+.slot-inspector {
+  background: rgba(20, 26, 44, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: 1;
+}
+
+.inspector-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.slot-tag {
+  background: rgba(0, 243, 255, 0.2);
+  color: var(--accent-cyan);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 4px;
+  letter-spacing: 1px;
+}
+
+.weapon-title {
+  font-family: 'Chakra Petch', sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+  color: #fff;
+  flex: 1;
+  margin-left: 10px;
+}
+
+.danger-btn {
+  background: rgba(255, 51, 102, 0.2);
+  border: 1px solid var(--accent-red);
+  color: #ff3366;
+  font-size: 11px;
+  padding: 4px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.danger-btn:hover {
+  background: rgba(255, 51, 102, 0.4);
+}
+
+.hidden {
+  display: none !important;
+}
+
+/* CURRENT WEAPON INFO & UPGRADE CARD */
+.card-glass {
+  background: rgba(30, 40, 68, 0.6);
+  border: 1px solid rgba(0, 243, 255, 0.25);
+  border-radius: 8px;
+  padding: 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.weapon-icon-large {
+  font-size: 38px;
+  min-width: 50px;
+  text-align: center;
+}
+
+.weapon-details-text {
+  flex: 1;
+}
+
+.upgrade-stars {
+  font-size: 12px;
+  color: #ffb703;
+  letter-spacing: 2px;
+  margin-bottom: 4px;
+}
+
+.stats-mini-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  font-size: 11px;
+  gap: 4px;
+  color: var(--text-muted);
+}
+
+.stats-mini-grid span b {
+  color: #fff;
+}
+
+.upgrade-btn {
+  background: linear-gradient(135deg, #00ff88, #00b4d8);
+  border: none;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-family: 'Chakra Petch', sans-serif;
+  font-size: 12px;
+  font-weight: 800;
+  color: #06151e;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  transition: all 0.2s;
+}
+
+.upgrade-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 0 15px rgba(0, 255, 136, 0.5);
+}
+
+.upgrade-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  background: #3a4759;
+  color: #8ca0ba;
+}
+
+.cost-tag {
+  font-size: 10px;
+  font-weight: 700;
+}
+
+/* SHOP SECTION */
+.shop-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+  overflow: hidden;
+}
+
+.shop-tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding-bottom: 6px;
+  overflow-x: auto;
+}
+
+.shop-tab {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-family: 'Chakra Petch', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s;
+}
+
+.shop-tab.active, .shop-tab:hover {
+  color: var(--accent-cyan);
+  background: rgba(0, 243, 255, 0.1);
+}
+
+.weapon-store-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+  max-height: 290px;
+  padding-right: 4px;
+}
+
+/* Store weapon card */
+.store-item-card {
+  background: rgba(24, 32, 54, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 10px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  transition: all 0.2s;
+}
+
+.store-item-card:hover {
+  background: rgba(35, 46, 76, 0.85);
+  border-color: rgba(0, 243, 255, 0.3);
+}
+
+.store-item-card.godly {
+  border: 1px solid rgba(255, 0, 128, 0.5);
+  background: linear-gradient(135deg, rgba(30, 20, 50, 0.8), rgba(20, 25, 45, 0.8));
+  box-shadow: inset 0 0 10px rgba(255, 0, 128, 0.1);
+}
+
+.store-item-icon {
+  font-size: 26px;
+  min-width: 38px;
+  text-align: center;
+}
+
+.store-item-details {
+  flex: 1;
+}
+
+.store-item-title-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 2px;
+}
+
+.store-item-name {
+  font-family: 'Chakra Petch', sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.category-tag {
+  font-size: 9px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.cat-gun { background: rgba(0, 180, 216, 0.2); color: #00b4d8; }
+.cat-godly-gun { background: rgba(255, 0, 128, 0.25); color: #ff007f; }
+.cat-melee { background: rgba(255, 183, 3, 0.2); color: #ffb703; }
+.cat-godly-melee { background: rgba(157, 78, 221, 0.3); color: #c77dff; }
+
+.store-item-desc {
+  font-size: 11px;
+  color: var(--text-muted);
+  line-height: 1.3;
+}
+
+.store-item-stats {
+  font-size: 10px;
+  color: #4deeea;
+  margin-top: 2px;
+}
+
+.buy-btn {
+  background: linear-gradient(135deg, #ffb703, #fb8500);
+  border: none;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-family: 'Chakra Petch', sans-serif;
+  font-size: 12px;
+  font-weight: 800;
+  color: #1a0f00;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  min-width: 75px;
+  transition: all 0.2s;
+}
+
+.buy-btn.free-buy {
+  background: linear-gradient(135deg, #00ff88, #00b4d8);
+  color: #061a12;
+}
+
+.buy-btn:hover:not(:disabled) {
+  transform: scale(1.05);
+  box-shadow: 0 0 12px rgba(255, 183, 3, 0.5);
+}
+
+.buy-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  filter: grayscale(80%);
+}
+
+.buy-btn.slot-occupied {
+  background: rgba(255, 51, 102, 0.15) !important;
+  border: 1px solid rgba(255, 51, 102, 0.4) !important;
+  color: #ff758c !important;
+  filter: none !important;
+  opacity: 0.65 !important;
+}
+
+/* FOOTER BAR */
+#footer-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 24px;
+  background: #090c14;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.hint-text {
+  color: #ffb703;
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(0,0,0,0.2);
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 243, 255, 0.3);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 243, 255, 0.6);
+}

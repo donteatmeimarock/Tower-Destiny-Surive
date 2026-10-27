@@ -67,6 +67,8 @@ class GameEngine {
     this.particles = [];
     this.damageNumbers = [];
     this.beams = []; // railgun laser beams
+    this.lightningArcs = []; // tesla coil chain lightning arcs
+    this.cameraShake = 0; // camera shake timer
 
     // Spawning waves
     this.waveSpawnsRemaining = [];
@@ -262,6 +264,24 @@ class GameEngine {
       if (currentStats.blastRadius) {
         statsHtml += `<span>Radius: <b>${currentStats.blastRadius}px</b></span>`;
       }
+      if (currentStats.chainCount) {
+        statsHtml += `<span>Chains: <b>${currentStats.chainCount}</b></span>`;
+      }
+      if (currentStats.slamRadius) {
+        statsHtml += `<span>Radius: <b>${currentStats.slamRadius}px</b></span>`;
+      }
+      if (currentStats.slowDuration) {
+        statsHtml += `<span>Slow: <b>${currentStats.slowDuration}s</b></span>`;
+      }
+      if (currentStats.vortexRadius) {
+        statsHtml += `<span>Zone: <b>${currentStats.vortexRadius}px</b></span>`;
+      }
+      if (currentStats.pullStrength) {
+        statsHtml += `<span>Pull: <b>${currentStats.pullStrength}</b></span>`;
+      }
+      if (currentStats.sawRadius) {
+        statsHtml += `<span>Saw: <b>${currentStats.sawRadius}px</b></span>`;
+      }
       this.inspectStatsGrid.innerHTML = statsHtml;
 
       // Upgrade button status
@@ -434,77 +454,351 @@ class GameEngine {
   }
 
   // ================= WAVE SPAWNING & ENEMY TYPES ================= //
+  // ENEMY ROSTER:
+  //  Scout Crawler     — weakest, wave 1+
+  //  Fast Runner       — agile, wave 2+
+  //  Armored Brute     — slow tank, wave 3+
+  //  Acid Spitter      — ranged attacker, wave 4+
+  //  Swarm Drone       — tiny fast cluster enemy, wave 4+
+  //  Poison Crawler    — leaves DoT effect on tower, wave 5+
+  //  Shadow Stalker    — cloaking flanker, wave 6+
+  //  Berserker         — gets stronger as HP drops, wave 7+
+  //  Shield Bearer     — reduces frontal damage, wave 8+
+  //  Necromancer       — ranged caster that summons minions, wave 9+
+  //  Titan Mutator     — massive juggernaut, wave 5+
+  //  BOSS: War Chief       — standard boss, odd waves 5+
+  //  BOSS: Doom Colossus   — earthquake boss, waves 7, 14, 21...
+  //  BOSS: Phantom Overlord— teleporting boss, waves 9, 18, 27...
+  //  BOSS: Inferno Wyrm    — fire dragon boss, waves 15, 25, 35...
+
   startWave(waveNum) {
     this.wave = waveNum;
     this.isWaveActive = true;
     this.updateHUD();
 
-    // Generate enemy queue for this wave
-    // Each wave has a distinct composition of enemies:
-    // Wave 1: Crawler/Scout (5 HP base) only - easy starter wave
-    // Wave 2: Crawlers + Fast Runners
-    // Wave 3: Crawlers + Runners + Armored Brute
-    // Wave 4: Swarm of Crawlers/Runners + Armored Brutes + Spitter
-    // Wave 5+: Includes Tank / Titan and Bosses
     this.waveSpawnsRemaining = [];
-    const count = 6 + waveNum * 4;
 
-    for (let i = 0; i < count; i++) {
-      let type = 'scout'; // Base weak enemy (5 HP)
-      const roll = Math.random();
+    // ---- WAVE COMPOSITION TABLE ----
+    // Each wave is carefully designed with themed compositions.
+    // After wave 20, waves loop with escalating difficulty modifiers.
 
-      if (waveNum === 1) {
-        type = 'scout';
-      } else if (waveNum === 2) {
-        type = roll < 0.7 ? 'scout' : 'runner';
-      } else if (waveNum === 3) {
-        if (roll < 0.5) type = 'scout';
-        else if (roll < 0.8) type = 'runner';
-        else type = 'armored';
-      } else if (waveNum === 4) {
-        if (roll < 0.4) type = 'scout';
-        else if (roll < 0.7) type = 'runner';
-        else if (roll < 0.88) type = 'armored';
-        else type = 'spitter';
-      } else {
-        // Wave 5+
-        if (i === count - 1 && waveNum % 2 === 1) {
-          type = 'boss';
-        } else if (roll < 0.3) {
-          type = 'scout';
-        } else if (roll < 0.55) {
-          type = 'runner';
-        } else if (roll < 0.75) {
-          type = 'armored';
-        } else if (roll < 0.9) {
-          type = 'spitter';
-        } else {
-          type = 'tank';
-        }
-      }
+    const waveTable = this.getWaveComposition(waveNum);
 
-      // Spacing between enemies: Made slower so waves feel tactical and distinct
-      const delay = 1.3 + Math.random() * 1.4;
-      this.waveSpawnsRemaining.push({ type, delay });
+    for (const entry of waveTable) {
+      const delay = entry.delay || (1.3 + Math.random() * 1.4);
+      this.waveSpawnsRemaining.push({ type: entry.type, delay });
     }
 
     this.spawnTimer = 2.0; // 2.0s preparation pause before first wave enemy
+  }
+
+  getWaveComposition(waveNum) {
+    const spawns = [];
+
+    // Helper: push N enemies of a type with optional delay
+    const add = (type, count, delay) => {
+      for (let i = 0; i < count; i++) {
+        spawns.push({ type, delay: delay || (1.3 + Math.random() * 1.4) });
+      }
+    };
+
+    // Helper: push random pick from weighted array
+    const addWeighted = (count, weights, delay) => {
+      // weights: [{ type, weight }]
+      const totalW = weights.reduce((s, w) => s + w.weight, 0);
+      for (let i = 0; i < count; i++) {
+        let roll = Math.random() * totalW;
+        let chosen = weights[0].type;
+        for (const w of weights) {
+          roll -= w.weight;
+          if (roll <= 0) { chosen = w.type; break; }
+        }
+        spawns.push({ type: chosen, delay: delay || (1.3 + Math.random() * 1.4) });
+      }
+    };
+
+    // Determine boss for this wave (if any)
+    const getBossType = (w) => {
+      if (w >= 15 && w % 10 === 5) return 'inferno_wyrm';    // Wave 15, 25, 35...
+      if (w >= 9 && w % 9 === 0) return 'phantom_overlord';   // Wave 9, 18, 27...
+      if (w >= 7 && w % 7 === 0) return 'doom_colossus';      // Wave 7, 14, 21...
+      if (w >= 5 && w % 2 === 1) return 'boss';               // Odd waves 5+
+      return null;
+    };
+
+    switch (waveNum) {
+      case 1: // Tutorial: Pure scouts
+        add('scout', 10);
+        break;
+
+      case 2: // Intro runners
+        add('scout', 7);
+        add('runner', 5);
+        break;
+
+      case 3: // Armored introduction
+        add('scout', 5);
+        add('runner', 5);
+        add('armored', 3);
+        break;
+
+      case 4: // Spitters & swarm drones debut
+        add('scout', 4);
+        add('runner', 4);
+        add('armored', 3);
+        add('spitter', 3);
+        add('swarm_drone', 6, 0.4);
+        break;
+
+      case 5: // First boss wave! + tanks + poison crawlers
+        add('runner', 6);
+        add('armored', 4);
+        add('spitter', 3);
+        add('poison_crawler', 3);
+        add('tank', 1);
+        add('boss', 1);
+        break;
+
+      case 6: // Shadow stalker debut — ambush wave
+        add('scout', 4);
+        add('runner', 5);
+        add('shadow_stalker', 5, 1.8);
+        add('armored', 3);
+        add('spitter', 3);
+        break;
+
+      case 7: // Doom Colossus boss + berserker debut
+        add('runner', 6);
+        add('armored', 4);
+        add('berserker', 4);
+        add('spitter', 3);
+        add('tank', 2);
+        add('doom_colossus', 1);
+        break;
+
+      case 8: // Shield bearer debut — defense wave
+        add('scout', 5);
+        add('shield_bearer', 5);
+        add('armored', 4);
+        add('berserker', 3);
+        add('spitter', 4);
+        add('poison_crawler', 3);
+        break;
+
+      case 9: // Necromancer debut + Phantom Overlord boss
+        add('runner', 5);
+        add('necromancer', 3, 2.5);
+        add('shadow_stalker', 4);
+        add('shield_bearer', 3);
+        add('armored', 3);
+        add('phantom_overlord', 1);
+        break;
+
+      case 10: // SWARM WAVE — massive drone assault
+        add('swarm_drone', 25, 0.3);
+        add('runner', 6);
+        add('poison_crawler', 4);
+        add('spitter', 3);
+        break;
+
+      case 11: // War Chief returns with elite guard
+        add('berserker', 5);
+        add('shield_bearer', 4);
+        add('necromancer', 2);
+        add('tank', 3);
+        add('shadow_stalker', 3);
+        add('boss', 1);
+        break;
+
+      case 12: // TANK RUSH — heavy assault
+        add('armored', 8);
+        add('tank', 5);
+        add('shield_bearer', 4);
+        add('spitter', 4);
+        break;
+
+      case 13: // Nightmare wave — all elites
+        add('berserker', 5);
+        add('shadow_stalker', 5);
+        add('necromancer', 3);
+        add('poison_crawler', 4);
+        add('shield_bearer', 3);
+        add('boss', 1);
+        break;
+
+      case 14: // Doom Colossus returns with army
+        add('tank', 4);
+        add('berserker', 4);
+        add('shield_bearer', 3);
+        add('necromancer', 3);
+        add('armored', 5);
+        add('doom_colossus', 1);
+        break;
+
+      case 15: // INFERNO WYRM debut — fire & fury
+        add('runner', 8);
+        add('berserker', 5);
+        add('poison_crawler', 4);
+        add('shadow_stalker', 4);
+        add('tank', 3);
+        add('inferno_wyrm', 1);
+        break;
+
+      case 16: // BLOOD MOON — everything is buffed (handled by spawn scaling)
+        add('scout', 6);
+        add('runner', 6);
+        add('armored', 5);
+        add('berserker', 5);
+        add('shadow_stalker', 4);
+        add('necromancer', 3);
+        add('shield_bearer', 3);
+        add('swarm_drone', 10, 0.3);
+        break;
+
+      case 17: // Double boss gauntlet
+        add('tank', 4);
+        add('berserker', 4);
+        add('shield_bearer', 4);
+        add('necromancer', 2);
+        add('boss', 1);
+        add('doom_colossus', 1);
+        break;
+
+      case 18: // Phantom Overlord returns + swarm chaos
+        add('swarm_drone', 15, 0.3);
+        add('shadow_stalker', 6);
+        add('necromancer', 3);
+        add('poison_crawler', 4);
+        add('phantom_overlord', 1);
+        break;
+
+      case 19: // ENDURANCE — relentless mixed assault
+        add('runner', 8);
+        add('berserker', 6);
+        add('armored', 5);
+        add('tank', 4);
+        add('shield_bearer', 4);
+        add('spitter', 5);
+        add('necromancer', 3);
+        add('boss', 1);
+        break;
+
+      case 20: // APOCALYPSE WAVE — triple boss!
+        add('tank', 5);
+        add('berserker', 6);
+        add('shield_bearer', 5);
+        add('necromancer', 4);
+        add('shadow_stalker', 5);
+        add('boss', 1);
+        add('doom_colossus', 1);
+        add('phantom_overlord', 1);
+        break;
+
+      default: {
+        // Wave 21+ : Infinite escalation with cycling themes
+        const cycle = ((waveNum - 1) % 5); // 0-4 cycle
+        const baseCount = 8 + Math.floor(waveNum * 1.5);
+
+        if (cycle === 0) {
+          // Swarm theme
+          add('swarm_drone', Math.floor(baseCount * 0.5), 0.3);
+          addWeighted(Math.floor(baseCount * 0.5), [
+            { type: 'runner', weight: 3 },
+            { type: 'poison_crawler', weight: 2 },
+            { type: 'berserker', weight: 2 },
+            { type: 'shadow_stalker', weight: 2 }
+          ]);
+        } else if (cycle === 1) {
+          // Heavy assault theme
+          addWeighted(baseCount, [
+            { type: 'armored', weight: 3 },
+            { type: 'tank', weight: 3 },
+            { type: 'shield_bearer', weight: 3 },
+            { type: 'berserker', weight: 2 }
+          ]);
+        } else if (cycle === 2) {
+          // Stealth & magic theme
+          addWeighted(baseCount, [
+            { type: 'shadow_stalker', weight: 3 },
+            { type: 'necromancer', weight: 3 },
+            { type: 'poison_crawler', weight: 2 },
+            { type: 'spitter', weight: 2 }
+          ]);
+        } else if (cycle === 3) {
+          // Balanced elite theme
+          addWeighted(baseCount, [
+            { type: 'berserker', weight: 2 },
+            { type: 'shield_bearer', weight: 2 },
+            { type: 'necromancer', weight: 2 },
+            { type: 'tank', weight: 2 },
+            { type: 'shadow_stalker', weight: 1 },
+            { type: 'spitter', weight: 1 }
+          ]);
+        } else {
+          // Chaos theme — everything!
+          addWeighted(baseCount, [
+            { type: 'scout', weight: 1 },
+            { type: 'runner', weight: 2 },
+            { type: 'armored', weight: 2 },
+            { type: 'spitter', weight: 2 },
+            { type: 'swarm_drone', weight: 2 },
+            { type: 'poison_crawler', weight: 2 },
+            { type: 'shadow_stalker', weight: 2 },
+            { type: 'berserker', weight: 2 },
+            { type: 'shield_bearer', weight: 2 },
+            { type: 'necromancer', weight: 1 },
+            { type: 'tank', weight: 1 }
+          ]);
+        }
+
+        // Add boss at end based on wave number pattern
+        const bossType = getBossType(waveNum);
+        if (bossType) {
+          add(bossType, 1);
+        }
+
+        // Every 10 waves past 20, add an extra boss
+        if (waveNum % 10 === 0 && waveNum > 20) {
+          add('inferno_wyrm', 1);
+        }
+        break;
+      }
+    }
+
+    // Shuffle the spawns (except last entry if it's a boss — keep boss at end)
+    const lastEntry = spawns[spawns.length - 1];
+    const isBossLast = lastEntry && ['boss', 'doom_colossus', 'phantom_overlord', 'inferno_wyrm'].includes(lastEntry.type);
+
+    if (isBossLast && spawns.length > 1) {
+      const bossEntry = spawns.pop();
+      // Shuffle non-boss entries
+      for (let i = spawns.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [spawns[i], spawns[j]] = [spawns[j], spawns[i]];
+      }
+      spawns.push(bossEntry);
+    } else {
+      for (let i = spawns.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [spawns[i], spawns[j]] = [spawns[j], spawns[i]];
+      }
+    }
+
+    return spawns;
   }
 
   spawnEnemy(type) {
     const startX = this.canvas.width + 30;
     const groundLevel = this.groundY;
 
-    // Distinct Enemy Types:
-    // 1. Scout / Crawler: First, least strong enemy. Exactly 5 HP base!
-    // 2. Fast Runner: Agile, 12 HP, runs fast.
-    // 3. Armored Brute: Slow, heavily armored, 35 HP.
-    // 4. Acid Spitter: Ranged shooter attacking tower from 260px away! 22 HP.
-    // 5. Titan Mutator: Massive juggernaut with heavy health (450+ HP)!
-    // 6. War Chief (Boss): Colossal boss with massive health (1500+ HP) so godly weapons cannot shred them!
+    // Scaling factor for infinite waves — enemies get tougher past wave 20
+    const lateScale = this.wave > 20 ? 1 + (this.wave - 20) * 0.08 : 1;
+    // Blood Moon buff for wave 16 and every 16th wave after
+    const isBloodMoon = this.wave % 16 === 0;
+    const bloodMoonMult = isBloodMoon ? 1.4 : 1;
 
-    let hp = 5; // Exactly 5 HP for the first, least strong enemy
-    let speed = 40; // slowed down pace
+    let hp = 5;
+    let speed = 40;
     let size = 22;
     let coinReward = 3;
     let color = '#38b000';
@@ -514,8 +808,22 @@ class GameEngine {
     let attackRange = 0; // 0 = melee against crates, >0 = ranged
     let enemyType = type;
 
+    // Special enemy flags
+    let cloakAlpha = 1.0;          // For shadow stalkers
+    let shieldHp = 0;              // For shield bearers
+    let maxShieldHp = 0;
+    let berserkerRage = false;     // For berserkers
+    let poisonDps = 0;             // For poison crawlers
+    let summonTimer = 0;           // For necromancers
+    let summonInterval = 0;
+    let teleportTimer = 0;         // For phantom overlord
+    let teleportInterval = 0;
+    let fireBreathTimer = 0;       // For inferno wyrm
+    let fireBreathInterval = 0;
+    let quakeTimer = 0;            // For doom colossus
+    let quakeInterval = 0;
+
     if (type === 'scout') {
-      // First, least strong enemy has 5 health (scaling gently in later waves)
       hp = 5 + (this.wave > 1 ? (this.wave - 1) * 2 : 0);
       speed = 46;
       size = 20;
@@ -551,9 +859,76 @@ class GameEngine {
       name = 'Acid Spitter';
       attackDamage = 10 + this.wave;
       attackInterval = 2.0;
-      attackRange = 260; // shoots acid at the crates from distance!
+      attackRange = 260;
+    } else if (type === 'swarm_drone') {
+      // Tiny, fast, comes in clusters — low HP but overwhelming numbers
+      hp = 3 + this.wave * 1;
+      speed = 110 + Math.random() * 30;
+      size = 12;
+      coinReward = 1;
+      color = '#adb5bd';
+      name = 'Swarm Drone';
+      attackDamage = 3 + Math.floor(this.wave * 0.5);
+      attackInterval = 0.6;
+    } else if (type === 'poison_crawler') {
+      // Leaves poison effect — damages tower over time when attacking
+      hp = 18 + this.wave * 5;
+      speed = 38;
+      size = 22;
+      coinReward = 7;
+      color = '#70e000';
+      name = 'Poison Crawler';
+      attackDamage = 5 + this.wave;
+      attackInterval = 1.5;
+      poisonDps = 3 + this.wave * 0.5; // extra DPS applied each attack tick
+    } else if (type === 'shadow_stalker') {
+      // Cloaks while moving — becomes partially invisible, harder to hit
+      hp = 25 + this.wave * 5;
+      speed = 72;
+      size = 20;
+      coinReward = 8;
+      color = '#4a4e69';
+      name = 'Shadow Stalker';
+      attackDamage = 12 + this.wave * 1.5;
+      attackInterval = 0.8;
+      cloakAlpha = 0.2; // nearly invisible while moving
+    } else if (type === 'berserker') {
+      // Gets faster and hits harder as HP drops
+      hp = 45 + this.wave * 10;
+      speed = 50;
+      size = 26;
+      coinReward = 12;
+      color = '#d62828';
+      name = 'Berserker';
+      attackDamage = 16 + this.wave * 2;
+      attackInterval = 1.0;
+      berserkerRage = true;
+    } else if (type === 'shield_bearer') {
+      // Has a regenerating frontal shield that absorbs damage
+      hp = 30 + this.wave * 8;
+      speed = 28;
+      size = 28;
+      coinReward = 11;
+      color = '#457b9d';
+      name = 'Shield Bearer';
+      attackDamage = 10 + this.wave * 1.5;
+      attackInterval = 1.3;
+      shieldHp = 20 + this.wave * 5;
+      maxShieldHp = shieldHp;
+    } else if (type === 'necromancer') {
+      // Ranged caster that periodically summons scout minions
+      hp = 40 + this.wave * 8;
+      speed = 25;
+      size = 26;
+      coinReward = 15;
+      color = '#7209b7';
+      name = 'Necromancer';
+      attackDamage = 8 + this.wave;
+      attackInterval = 2.0;
+      attackRange = 300;
+      summonInterval = 6.0; // summons a minion every 6s
+      summonTimer = 3.0; // first summon after 3s
     } else if (type === 'tank') {
-      // Nerfed to 75% of previous health and speed
       hp = 335 + this.wave * 135;
       speed = 15;
       size = 42;
@@ -563,16 +938,58 @@ class GameEngine {
       attackDamage = 24 + this.wave * 3;
       attackInterval = 1.6;
     } else if (type === 'boss') {
-      // Nerfed to 75% of previous health and speed
       hp = 1125 + this.wave * 450;
       speed = 13.5;
       size = 56;
       coinReward = 100;
       color = '#ff0054';
-      name = 'WAR CHIEF';
+      name = '⚔ WAR CHIEF';
       attackDamage = 42 + this.wave * 6;
       attackInterval = 1.4;
+    } else if (type === 'doom_colossus') {
+      // Earthquake boss — periodically shakes screen and deals AoE to tower
+      hp = 2000 + this.wave * 600;
+      speed = 10;
+      size = 68;
+      coinReward = 150;
+      color = '#6b2d10';
+      name = '💀 DOOM COLOSSUS';
+      attackDamage = 55 + this.wave * 8;
+      attackInterval = 1.6;
+      quakeInterval = 8.0;
+      quakeTimer = 5.0;
+    } else if (type === 'phantom_overlord') {
+      // Teleporting boss — phases in and out, hard to target
+      hp = 1500 + this.wave * 500;
+      speed = 20;
+      size = 52;
+      coinReward = 140;
+      color = '#560bad';
+      name = '👻 PHANTOM OVERLORD';
+      attackDamage = 38 + this.wave * 5;
+      attackInterval = 1.2;
+      teleportInterval = 5.0;
+      teleportTimer = 3.0;
+      cloakAlpha = 0.7;
+    } else if (type === 'inferno_wyrm') {
+      // Fire dragon boss — breathes fire at tower periodically
+      hp = 3000 + this.wave * 800;
+      speed = 12;
+      size = 74;
+      coinReward = 200;
+      color = '#ff4800';
+      name = '🐉 INFERNO WYRM';
+      attackDamage = 65 + this.wave * 10;
+      attackInterval = 1.8;
+      attackRange = 200;
+      fireBreathInterval = 6.0;
+      fireBreathTimer = 4.0;
     }
+
+    // Apply late-game scaling and blood moon
+    hp = Math.floor(hp * lateScale * bloodMoonMult);
+    attackDamage = Math.floor(attackDamage * lateScale * bloodMoonMult);
+    coinReward = Math.floor(coinReward * lateScale);
 
     this.enemies.push({
       type: enemyType,
@@ -589,7 +1006,22 @@ class GameEngine {
       attackInterval: attackInterval,
       attackRange: attackRange,
       attackCooldown: 0.5,
-      hitFlash: 0
+      hitFlash: 0,
+      // Special properties
+      cloakAlpha: cloakAlpha,
+      shieldHp: shieldHp,
+      maxShieldHp: maxShieldHp,
+      berserkerRage: berserkerRage,
+      poisonDps: poisonDps,
+      summonTimer: summonTimer,
+      summonInterval: summonInterval,
+      teleportTimer: teleportTimer,
+      teleportInterval: teleportInterval,
+      fireBreathTimer: fireBreathTimer,
+      fireBreathInterval: fireBreathInterval,
+      quakeTimer: quakeTimer,
+      quakeInterval: quakeInterval,
+      phaseAlpha: 1.0 // for phantom overlord phasing visual
     });
   }
 
@@ -631,9 +1063,28 @@ class GameEngine {
       } else if (this.enemies.length === 0) {
         // Wave complete!
         this.isWaveActive = false;
-        this.overlayTitle.innerText = `WAVE ${this.wave} CLEARED!`;
-        this.overlaySub.innerText = `Great defense! You received bonus coins.`;
-        this.coins += 15 + this.wave * 5;
+        const waveThemes = {
+          10: '🐝 SWARM WAVE SURVIVED!',
+          12: '🪖 TANK RUSH SURVIVED!',
+          13: '💀 NIGHTMARE SURVIVED!',
+          15: '🐉 INFERNO WYRM SLAIN!',
+          16: '🩸 BLOOD MOON SURVIVED!',
+          17: '⚔ BOSS GAUNTLET CLEARED!',
+          20: '☠ APOCALYPSE SURVIVED!'
+        };
+        const themeTitle = waveThemes[this.wave];
+        this.overlayTitle.innerText = themeTitle || `WAVE ${this.wave} CLEARED!`;
+        const bonusCoins = 15 + this.wave * 5 + (this.wave >= 10 ? this.wave * 3 : 0);
+        this.overlaySub.innerText = `Great defense! +${bonusCoins} bonus coins.`;
+        this.coins += bonusCoins;
+        // Bonus tower heal every 5 waves
+        if (this.wave % 5 === 0) {
+          const healAmount = Math.min(50 + this.wave * 5, this.maxTowerHp - this.towerHp);
+          if (healAmount > 0) {
+            this.towerHp += healAmount;
+            this.overlaySub.innerText += ` Tower healed +${healAmount} HP!`;
+          }
+        }
         window.soundManager.playUpgrade();
         this.updateHUD();
         this.overlayBanner.classList.remove('hidden');
@@ -646,9 +1097,81 @@ class GameEngine {
       this.updateSlotWeapon(slot, index, dt);
     });
 
+    // Camera shake decay
+    if (this.cameraShake > 0) {
+      this.cameraShake -= dt;
+      if (this.cameraShake < 0) this.cameraShake = 0;
+    }
+
     // 3. Update Projectiles
     for (let i = this.projectiles.length - 1; i >= 0; i--) {
       const p = this.projectiles[i];
+
+      // Saw Projectile (Buzz Saw boomerang)
+      if (p.type === 'saw') {
+        p.rotAngle = (p.rotAngle || 0) + 30 * dt;
+        p.lifetime -= dt;
+
+        // Decrement hit cooldowns
+        if (p.hitCooldowns) {
+          for (let [enemy, cd] of p.hitCooldowns.entries()) {
+            if (cd - dt <= 0) p.hitCooldowns.delete(enemy);
+            else p.hitCooldowns.set(enemy, cd - dt);
+          }
+        }
+
+        // Move saw forward or return
+        if (!p.returning) {
+          p.x += p.vx * dt;
+          if (p.x >= p.originX + p.range) {
+            p.returning = true;
+            p.vx = -p.sawSpeed;
+          }
+        } else {
+          p.x += p.vx * dt;
+          if (p.x <= p.originX) {
+            // Returned to crate launcher!
+            this.projectiles.splice(i, 1);
+            continue;
+          }
+        }
+
+        // Spark trail
+        if (Math.random() < 0.4) {
+          this.particles.push({
+            x: p.x + (Math.random() - 0.5) * 8,
+            y: p.y + (Math.random() - 0.5) * 8,
+            vx: (Math.random() - 0.5) * 50,
+            vy: (Math.random() - 0.5) * 50,
+            color: '#ffd166',
+            radius: 2,
+            life: 0.18,
+            maxLife: 0.18
+          });
+        }
+
+        // Damage all enemies it touches (with individual cooldown)
+        for (let e of this.enemies) {
+          const dx = p.x - e.x;
+          const dy = p.y - e.y;
+          const dist = Math.hypot(dx, dy);
+
+          if (dist < e.size / 2 + p.radius) {
+            if (!p.hitCooldowns.has(e)) {
+              p.hitCooldowns.set(e, 0.28);
+              this.damageEnemy(e, p.damage, '#ffd166');
+              this.createExplosionParticles(e.x, e.y, '#e0e1dd', 4);
+              window.soundManager.playSaw();
+            }
+          }
+        }
+
+        if (p.lifetime <= 0) {
+          this.projectiles.splice(i, 1);
+        }
+        continue;
+      }
+
       p.x += p.vx * dt;
       p.y += p.vy * dt;
       p.lifetime -= dt;
@@ -695,25 +1218,168 @@ class GameEngine {
       }
     }
 
+    // 4b. Update Lightning Arcs (Tesla Coil)
+    for (let i = this.lightningArcs.length - 1; i >= 0; i--) {
+      const arc = this.lightningArcs[i];
+      arc.lifetime -= dt;
+      if (arc.lifetime <= 0) {
+        this.lightningArcs.splice(i, 1);
+      }
+    }
+
     // 5. Update Enemies
     for (let i = this.enemies.length - 1; i >= 0; i--) {
       const enemy = this.enemies[i];
       if (enemy.hitFlash > 0) enemy.hitFlash -= dt;
 
+      // === BERSERKER RAGE: Speed & damage increase as HP drops ===
+      if (enemy.berserkerRage) {
+        const hpRatio = enemy.hp / enemy.maxHp;
+        const rageMult = 1 + (1 - hpRatio) * 1.5; // up to 2.5x at near-death
+        enemy.speed = (50 + (this.wave > 20 ? 10 : 0)) * rageMult;
+        // Visual: color shifts to brighter red as rage increases
+        const rageIntensity = Math.floor((1 - hpRatio) * 200);
+        enemy.color = `rgb(${Math.min(255, 214 + rageIntensity)}, ${Math.max(0, 40 - rageIntensity)}, ${Math.max(0, 40 - rageIntensity)})`;
+      }
+
+      // === SHADOW STALKER: Cloak while moving ===
+      if (enemy.type === 'shadow_stalker') {
+        const meleeX = this.towerBaseX + this.crateWidth / 2 + enemy.size / 2;
+        if (enemy.x > meleeX + 20) {
+          enemy.cloakAlpha = 0.15 + Math.sin(performance.now() / 300) * 0.1;
+        } else {
+          enemy.cloakAlpha = 0.8; // becomes more visible when attacking
+        }
+      }
+
+      // === PHANTOM OVERLORD: Teleport behavior ===
+      if (enemy.teleportInterval > 0) {
+        enemy.teleportTimer -= dt;
+        if (enemy.teleportTimer <= 0) {
+          enemy.teleportTimer = enemy.teleportInterval;
+          // Teleport to a random x position (still ahead of tower)
+          const minX = this.towerBaseX + 100;
+          const maxX = this.canvas.width - 50;
+          const newX = minX + Math.random() * (maxX - minX);
+          this.createExplosionParticles(enemy.x, enemy.y, '#560bad', 20);
+          enemy.x = newX;
+          enemy.phaseAlpha = 0.1; // fade in effect
+          this.createExplosionParticles(enemy.x, enemy.y, '#9b5de5', 15);
+        }
+        // Fade in after teleport
+        if (enemy.phaseAlpha < 1.0) {
+          enemy.phaseAlpha = Math.min(1.0, enemy.phaseAlpha + dt * 2.0);
+        }
+      }
+
+      // === NECROMANCER: Summon minions ===
+      if (enemy.summonInterval > 0 && enemy.hp > 0) {
+        enemy.summonTimer -= dt;
+        if (enemy.summonTimer <= 0) {
+          enemy.summonTimer = enemy.summonInterval;
+          // Spawn a scout minion near the necromancer
+          this.createExplosionParticles(enemy.x + 20, enemy.y, '#7209b7', 12);
+          const minionHp = 5 + this.wave * 2;
+          this.enemies.push({
+            type: 'scout', name: 'Summoned Scout',
+            x: enemy.x + 30, y: this.groundY - 10,
+            hp: minionHp, maxHp: minionHp,
+            speed: 55, size: 16, coinReward: 1,
+            color: '#b388ff', // purple-tinted summoned scout
+            attackDamage: 4 + this.wave, attackInterval: 1.2,
+            attackRange: 0, attackCooldown: 0.5, hitFlash: 0,
+            cloakAlpha: 1.0, shieldHp: 0, maxShieldHp: 0,
+            berserkerRage: false, poisonDps: 0,
+            summonTimer: 0, summonInterval: 0,
+            teleportTimer: 0, teleportInterval: 0,
+            fireBreathTimer: 0, fireBreathInterval: 0,
+            quakeTimer: 0, quakeInterval: 0, phaseAlpha: 1.0
+          });
+        }
+      }
+
+      // === DOOM COLOSSUS: Earthquake AoE ===
+      if (enemy.quakeInterval > 0 && enemy.hp > 0) {
+        enemy.quakeTimer -= dt;
+        if (enemy.quakeTimer <= 0) {
+          enemy.quakeTimer = enemy.quakeInterval;
+          const quakeDmg = 15 + this.wave * 3;
+          this.towerHp -= quakeDmg;
+          // Screen shake particles
+          for (let q = 0; q < 5; q++) {
+            const qx = this.towerBaseX + Math.random() * this.crateWidth;
+            const qy = this.groundY - Math.random() * (this.crateHeight * 5);
+            this.createExplosionParticles(qx, qy, '#6b2d10', 8);
+          }
+          this.addDamageText(this.towerBaseX + 35, this.groundY - 120, `QUAKE -${quakeDmg}`, '#ff6b35');
+          window.soundManager.playExplosion();
+          if (this.towerHp <= 0) { this.towerHp = 0; this.triggerGameOver(); }
+          this.updateHUD();
+        }
+      }
+
+      // === INFERNO WYRM: Fire breath at tower ===
+      if (enemy.fireBreathInterval > 0 && enemy.hp > 0) {
+        enemy.fireBreathTimer -= dt;
+        if (enemy.fireBreathTimer <= 0) {
+          enemy.fireBreathTimer = enemy.fireBreathInterval;
+          const fireDmg = 25 + this.wave * 4;
+          this.towerHp -= fireDmg;
+          // Fire breath particle spray
+          for (let f = 0; f < 20; f++) {
+            const angle = Math.PI + (Math.random() - 0.5) * 0.8;
+            this.particles.push({
+              x: enemy.x - enemy.size / 2,
+              y: enemy.y,
+              vx: Math.cos(angle) * (200 + Math.random() * 150),
+              vy: Math.sin(angle) * (100 + Math.random() * 80),
+              color: Math.random() > 0.5 ? '#ff4800' : '#ffaa00',
+              radius: 6 + Math.random() * 8,
+              life: 0.6 + Math.random() * 0.3,
+              maxLife: 0.9
+            });
+          }
+          this.addDamageText(this.towerBaseX + 35, this.groundY - 80, `🔥 FIRE -${fireDmg}`, '#ff4800');
+          window.soundManager.playFlame();
+          if (this.towerHp <= 0) { this.towerHp = 0; this.triggerGameOver(); }
+          this.updateHUD();
+        }
+      }
+
       // Move left towards crates or stop within attack range
       const meleeTargetX = this.towerBaseX + this.crateWidth / 2 + enemy.size / 2;
       const targetStopX = enemy.attackRange > 0 ? (this.towerBaseX + enemy.attackRange) : meleeTargetX;
 
+      // Slow debuff handling (from Graviton Hammer)
+      let effectiveSpeed = enemy.speed;
+      if (enemy.slowTimer > 0) {
+        enemy.slowTimer -= dt;
+        effectiveSpeed *= (enemy.slowMult || 0.5);
+      }
+
       if (enemy.x > targetStopX) {
-        enemy.x -= enemy.speed * dt;
+        enemy.x -= effectiveSpeed * dt;
       } else {
         // Attack the crates / tower
         enemy.attackCooldown -= dt;
         if (enemy.attackCooldown <= 0) {
           enemy.attackCooldown = enemy.attackInterval;
-          const dmg = enemy.attackDamage || (8 + this.wave * 2);
+          let dmg = enemy.attackDamage || (8 + this.wave * 2);
+
+          // Berserker bonus damage at low HP
+          if (enemy.berserkerRage) {
+            const hpRatio = enemy.hp / enemy.maxHp;
+            dmg = dmg * (1 + (1 - hpRatio) * 1.0);
+          }
+
           this.towerHp -= dmg;
           window.soundManager.playHurt();
+
+          // Poison crawler extra DoT
+          if (enemy.poisonDps > 0) {
+            this.towerHp -= enemy.poisonDps;
+            this.addDamageText(this.towerBaseX + this.crateWidth / 2 - 20, this.groundY - 200, `☠ -${enemy.poisonDps.toFixed(0)}`, '#70e000');
+          }
 
           // Visual hit impact on tower crates
           const hitCrateY = this.groundY - (Math.floor(Math.random() * 5) + 0.5) * this.crateHeight;
@@ -1022,6 +1688,123 @@ class GameEngine {
         }
         break;
       }
+
+      // 9. SNIPER RIFLE: high-velocity long-range precision shots
+      case 'sniper': {
+        slot.timer += dt;
+        if (target) {
+          slot.angle = this.getPredictiveAimAngle(muzzleX, muzzleY, target, stats.bulletSpeed);
+        }
+        if (slot.timer >= stats.interval) {
+          if (target) {
+            slot.timer = 0;
+            const leadAngle = this.getPredictiveAimAngle(muzzleX, muzzleY, target, stats.bulletSpeed);
+            const spawnX = muzzleX + Math.cos(leadAngle) * 30;
+            const spawnY = muzzleY + Math.sin(leadAngle) * 30;
+            this.fireBullet(spawnX, spawnY, leadAngle, stats.damage, stats.bulletSpeed, '#ffd166', 3.5);
+            this.createExplosionParticles(spawnX, spawnY, '#ffb703', 10);
+            window.soundManager.playShoot('sniper');
+          }
+        }
+        break;
+      }
+
+      // 10. TESLA COIL: chain lightning bouncing between multiple enemies
+      case 'tesla_coil': {
+        slot.timer += dt;
+        if (target) {
+          slot.angle = Math.atan2(target.y - muzzleY, target.x - muzzleX);
+        }
+        if (slot.timer >= stats.interval) {
+          if (target) {
+            slot.timer = 0;
+            this.fireTeslaLightning(muzzleX, muzzleY, target, stats.damage, stats.chainCount, stats.chainDecay, stats.range);
+            window.soundManager.playTesla();
+          }
+        }
+        break;
+      }
+
+      // 11. BUZZ SAW: Launches returning boomerang saw blade
+      case 'buzz_saw': {
+        slot.timer += dt;
+        if (slot.timer >= stats.interval) {
+          slot.timer = 0;
+          this.fireBuzzSaw(muzzleX, muzzleY, stats.damage, stats.sawSpeed, stats.range, stats.sawRadius);
+          window.soundManager.playSaw();
+        }
+        break;
+      }
+
+      // 12. GRAVITON HAMMER: Periodic shockwave slam that slows enemies
+      case 'graviton_hammer': {
+        slot.timer += dt;
+        const chargeProgress = Math.min(1.0, slot.timer / stats.cycleInterval);
+        // Animate hammer raising back overhead as charge fills
+        slot.angle = -0.35 - chargeProgress * 0.95;
+
+        if (slot.timer >= stats.cycleInterval) {
+          slot.timer = 0;
+          slot.angle = 0.45; // Slam down forward
+          const slamX = coords.x + this.crateWidth / 2 + 35;
+          const slamY = coords.y;
+          this.triggerHammerSlam(slamX, slamY, stats.damage, stats.slamRadius, stats.slowDuration);
+        }
+        break;
+      }
+
+      // 13. VOID RIFT: Persistent gravitational anomaly that pulls and rapidly damages enemies
+      case 'void_rift': {
+        slot.subTimer += dt;
+        slot.angle = (slot.angle + 4.5 * dt) % (Math.PI * 2);
+        const mountX = coords.x + this.crateWidth / 2 + 35;
+        const mountY = coords.y;
+
+        // Inward spiral vortex particles
+        if (Math.random() < 0.65) {
+          const pAngle = Math.random() * Math.PI * 2;
+          const pDist = stats.vortexRadius * (0.5 + Math.random() * 0.7);
+          this.particles.push({
+            x: mountX + Math.cos(pAngle) * pDist,
+            y: mountY + Math.sin(pAngle) * pDist,
+            vx: -Math.cos(pAngle) * 95 - Math.sin(pAngle) * 75,
+            vy: -Math.sin(pAngle) * 95 + Math.cos(pAngle) * 75,
+            color: Math.random() > 0.5 ? '#7209b7' : '#c77dff',
+            radius: 2 + Math.random() * 2.5,
+            life: 0.38,
+            maxLife: 0.38
+          });
+        }
+
+        // Pull enemies towards the singularity
+        for (let enemy of this.enemies) {
+          const dx = mountX - enemy.x;
+          const dy = mountY - enemy.y;
+          const dist = Math.hypot(dx, dy);
+          if (dist <= stats.vortexRadius * 1.5 && dist > 10) {
+            const pull = stats.pullStrength * dt;
+            enemy.x += (dx / dist) * pull;
+            enemy.y += (dy / dist) * pull * 0.35;
+          }
+        }
+
+        // Periodic damage ticks
+        if (slot.subTimer >= stats.tickInterval) {
+          slot.subTimer = 0;
+          let hitAny = false;
+          for (let enemy of this.enemies) {
+            const dist = Math.hypot(enemy.x - mountX, enemy.y - mountY);
+            if (dist <= stats.vortexRadius + enemy.size / 2) {
+              this.damageEnemy(enemy, stats.damage, '#9d4edd');
+              hitAny = true;
+            }
+          }
+          if (hitAny && Math.random() < 0.3) {
+            window.soundManager.playVoid();
+          }
+        }
+        break;
+      }
     }
   }
 
@@ -1091,6 +1874,136 @@ class GameEngine {
     });
   }
 
+  fireBuzzSaw(x, y, damage, speed, range, radius) {
+    this.projectiles.push({
+      type: 'saw',
+      x: x,
+      y: y,
+      originX: x,
+      originY: y,
+      vx: speed,
+      vy: 0,
+      range: range,
+      sawSpeed: speed,
+      radius: radius,
+      damage: damage,
+      returning: false,
+      rotAngle: 0,
+      lifetime: 8.0,
+      hitCooldowns: new Map()
+    });
+  }
+
+  fireTeslaLightning(originX, originY, firstTarget, baseDamage, maxChains, chainDecay, range) {
+    let currentTarget = firstTarget;
+    let currentDamage = baseDamage;
+    const hitEnemies = new Set([firstTarget]);
+
+    // First zap from coil to initial target
+    this.damageEnemy(firstTarget, currentDamage, '#00f3ff');
+    this.createExplosionParticles(firstTarget.x, firstTarget.y, '#00f3ff', 8);
+    this.addLightningArc(originX, originY, firstTarget.x, firstTarget.y, '#00f3ff');
+
+    // Bounce to next enemies
+    let chainsDone = 1;
+    while (chainsDone < maxChains) {
+      currentDamage *= chainDecay;
+      let nextTarget = null;
+      let minD = 190; // chain bounce radius
+
+      for (let enemy of this.enemies) {
+        if (hitEnemies.has(enemy) || enemy.hp <= 0) continue;
+        const d = Math.hypot(enemy.x - currentTarget.x, enemy.y - currentTarget.y);
+        if (d < minD) {
+          minD = d;
+          nextTarget = enemy;
+        }
+      }
+
+      if (!nextTarget) break;
+
+      hitEnemies.add(nextTarget);
+      this.damageEnemy(nextTarget, currentDamage, '#c77dff');
+      this.createExplosionParticles(nextTarget.x, nextTarget.y, '#c77dff', 6);
+      this.addLightningArc(currentTarget.x, currentTarget.y, nextTarget.x, nextTarget.y, '#b388ff');
+
+      currentTarget = nextTarget;
+      chainsDone++;
+    }
+  }
+
+  addLightningArc(x1, y1, x2, y2, color = '#00f3ff') {
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    const dist = Math.hypot(dx, dy);
+    const steps = Math.max(4, Math.floor(dist / 24));
+    const points = [{ x: x1, y: y1 }];
+    const normalX = -dy / (dist || 1);
+    const normalY = dx / (dist || 1);
+
+    for (let s = 1; s < steps; s++) {
+      const t = s / steps;
+      const jitter = (Math.random() - 0.5) * 22;
+      points.push({
+        x: x1 + dx * t + normalX * jitter,
+        y: y1 + dy * t + normalY * jitter
+      });
+    }
+    points.push({ x: x2, y: y2 });
+
+    this.lightningArcs.push({
+      points,
+      color,
+      lifetime: 0.28,
+      maxLifetime: 0.28
+    });
+  }
+
+  triggerHammerSlam(slamX, slamY, damage, radius, slowDuration) {
+    this.cameraShake = 0.22;
+    window.soundManager.playHammer();
+
+    // Ground slam fissure particles
+    for (let i = 0; i < 24; i++) {
+      const angle = (Math.PI * 2 * i) / 24;
+      this.particles.push({
+        x: slamX,
+        y: slamY,
+        vx: Math.cos(angle) * (160 + Math.random() * 80),
+        vy: Math.sin(angle) * (160 + Math.random() * 80),
+        color: Math.random() > 0.4 ? '#9d4edd' : '#c77dff',
+        radius: 4 + Math.random() * 4,
+        life: 0.4,
+        maxLife: 0.4
+      });
+    }
+
+    // Shockwave ring particle
+    this.particles.push({
+      x: slamX,
+      y: slamY,
+      vx: 0,
+      vy: 0,
+      color: '#e0aaff',
+      radius: radius,
+      isRing: true,
+      life: 0.35,
+      maxLife: 0.35
+    });
+
+    // Damage and slow all enemies within radius
+    for (let enemy of this.enemies) {
+      const dist = Math.hypot(enemy.x - slamX, enemy.y - slamY);
+      if (dist <= radius + enemy.size / 2) {
+        this.damageEnemy(enemy, damage, '#9d4edd');
+        enemy.slowTimer = slowDuration;
+        enemy.slowMult = 0.5;
+        this.addDamageText(enemy.x, enemy.y - 25, '❄ SLOW', '#00f3ff');
+        this.createExplosionParticles(enemy.x, enemy.y, '#c77dff', 6);
+      }
+    }
+  }
+
   pointToSegmentDistance(px, py, x1, y1, x2, y2) {
     const l2 = (x2 - x1) * (x2 - x1) + (y2 - y1) * (y2 - y1);
     if (l2 === 0) return Math.hypot(px - x1, py - y1);
@@ -1127,9 +2040,20 @@ class GameEngine {
   }
 
   damageEnemy(enemy, amount, color) {
-    enemy.hp -= amount;
+    // Shield Bearer: Shield absorbs damage first
+    if (enemy.shieldHp > 0) {
+      const absorbed = Math.min(enemy.shieldHp, amount);
+      enemy.shieldHp -= absorbed;
+      amount -= absorbed;
+      if (absorbed > 0) {
+        this.addDamageText(enemy.x + (Math.random() - 0.5) * 20, enemy.y - 20, `🛡${absorbed.toFixed(1)}`, '#457b9d');
+      }
+    }
+    if (amount > 0) {
+      enemy.hp -= amount;
+      this.addDamageText(enemy.x + (Math.random() - 0.5) * 20, enemy.y - 10, amount.toFixed(1), color);
+    }
     enemy.hitFlash = 0.08;
-    this.addDamageText(enemy.x + (Math.random() - 0.5) * 20, enemy.y - 10, amount.toFixed(1), color);
   }
 
   addDamageText(x, y, text, color) {
@@ -1179,6 +2103,8 @@ class GameEngine {
     this.particles = [];
     this.damageNumbers = [];
     this.beams = [];
+    this.lightningArcs = [];
+    this.cameraShake = 0;
 
     this.slots.forEach(s => {
       s.weapon = null;
@@ -1197,13 +2123,22 @@ class GameEngine {
 
   // ================= DRAWING / RENDERING ================= //
   draw() {
+    this.ctx.save();
+    if (this.cameraShake > 0) {
+      const shakeAmt = this.cameraShake * 18;
+      const sx = (Math.random() - 0.5) * shakeAmt;
+      const sy = (Math.random() - 0.5) * shakeAmt;
+      this.ctx.translate(sx, sy);
+    }
+
     this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
     // 1. Cyber Sci-fi Grid Background
     this.drawBackground();
 
-    // 2. Draw Beams
+    // 2. Draw Beams & Lightning
     this.drawRailgunBeams();
+    this.drawLightningArcs();
 
     // 3. Draw The 5 Crates Stack and Character
     this.drawTowerAndCharacter();
@@ -1219,6 +2154,8 @@ class GameEngine {
 
     // 7. Draw Floating Numbers
     this.drawDamageNumbers();
+
+    this.ctx.restore();
   }
 
   drawBackground() {
@@ -1325,10 +2262,11 @@ class GameEngine {
 
     // Close range spinning weapons are mounted on an extended front mechanical arm (x + 35)
     // so they spin completely free in open air and never hit or overlap the crate body!
-    if (slot.weapon === 'chainsaw' || slot.weapon === 'energy_blade') {
+    if (slot.weapon === 'chainsaw' || slot.weapon === 'energy_blade' || slot.weapon === 'void_rift' || slot.weapon === 'graviton_hammer') {
       const mountX = x + this.crateWidth / 2 + 15;
-      // Ensure the spinning blade center is elevated high enough above groundY so the blade tip never clips the ground!
-      const minClearance = stats.spinRadius + 6;
+      // Ensure the weapon center is elevated high enough above groundY
+      const radius = stats.spinRadius || 36;
+      const minClearance = radius + 6;
       const mountY = Math.min(y, this.groundY - minClearance);
       
       // Draw mechanical mounting arm extending from the crate
@@ -1341,11 +2279,11 @@ class GameEngine {
 
       this.ctx.translate(mountX, mountY);
     } else {
-      // Guns are mounted on the front edge of the crate to have unrestricted downward firing angle
+      // Guns and launchers are mounted on the front edge of the crate
       this.ctx.translate(x + this.crateWidth / 2 - 2, y);
     }
 
-    // Close range spinning weapons
+    // Close range spinning & field weapons
     if (slot.weapon === 'chainsaw') {
       this.ctx.rotate(slot.angle);
       // Chainsaw motor base
@@ -1418,7 +2356,80 @@ class GameEngine {
       return;
     }
 
-    // Aimed Guns (Rotates freely down to ~90° directly below)
+    if (slot.weapon === 'void_rift') {
+      // Swirling gravity singularity vortex
+      this.ctx.rotate(slot.angle);
+
+      // Outer violet gravity distortion
+      this.ctx.shadowColor = '#9d4edd';
+      this.ctx.shadowBlur = 18;
+
+      // Accretion disk radial gradient
+      const grad = this.ctx.createRadialGradient(0, 0, 4, 0, 0, 26);
+      grad.addColorStop(0, '#ffffff');
+      grad.addColorStop(0.2, '#c77dff');
+      grad.addColorStop(0.6, '#5a189a');
+      grad.addColorStop(1, 'rgba(16, 0, 43, 0)');
+      this.ctx.fillStyle = grad;
+      this.ctx.beginPath();
+      this.ctx.arc(0, 0, 26, 0, Math.PI * 2);
+      this.ctx.fill();
+
+      // Pitch-black singularity core
+      this.ctx.fillStyle = '#05020a';
+      this.ctx.beginPath();
+      this.ctx.arc(0, 0, 11, 0, Math.PI * 2);
+      this.ctx.fill();
+
+      // Orbiting micro-singularity dots
+      this.ctx.fillStyle = '#e0aaff';
+      for (let o = 0; o < 3; o++) {
+        const oAngle = (Math.PI * 2 * o) / 3;
+        this.ctx.beginPath();
+        this.ctx.arc(Math.cos(oAngle) * 16, Math.sin(oAngle) * 16, 2, 0, Math.PI * 2);
+        this.ctx.fill();
+      }
+
+      // Pure white singularity center point
+      this.ctx.fillStyle = '#ffffff';
+      this.ctx.beginPath();
+      this.ctx.arc(0, 0, 3, 0, Math.PI * 2);
+      this.ctx.fill();
+
+      this.ctx.restore();
+      return;
+    }
+
+    if (slot.weapon === 'graviton_hammer') {
+      this.ctx.rotate(slot.angle);
+
+      // Articulated hydraulic shaft
+      this.ctx.fillStyle = '#2b2d42';
+      this.ctx.fillRect(0, -5, 32, 10);
+      this.ctx.fillStyle = '#8d99ae';
+      this.ctx.fillRect(4, -2.5, 24, 5);
+
+      // Heavy grav-hammer head
+      this.ctx.shadowColor = '#9d4edd';
+      this.ctx.shadowBlur = 12;
+      this.ctx.fillStyle = '#240046';
+      this.ctx.fillRect(28, -15, 20, 30);
+
+      // Impact face
+      this.ctx.fillStyle = '#c77dff';
+      this.ctx.fillRect(46, -13, 4, 26);
+
+      // Glowing gravity core
+      this.ctx.fillStyle = '#e0aaff';
+      this.ctx.beginPath();
+      this.ctx.arc(38, 0, 5, 0, Math.PI * 2);
+      this.ctx.fill();
+
+      this.ctx.restore();
+      return;
+    }
+
+    // Aimed Weapons & Guns
     this.ctx.rotate(slot.angle);
 
     if (slot.weapon === 'turret') {
@@ -1442,6 +2453,61 @@ class GameEngine {
       this.ctx.fillRect(0, -6, 28, 12);
       this.ctx.fillStyle = '#ffaa00';
       this.ctx.fillRect(26, -5, 4, 10);
+    } else if (slot.weapon === 'sniper') {
+      // Precision long-range rifle
+      this.ctx.fillStyle = '#1b263b';
+      this.ctx.fillRect(0, -3, 38, 6); // long precision barrel
+      this.ctx.fillStyle = '#343a40';
+      this.ctx.fillRect(-8, -2, 10, 5); // stock
+      // Muzzle brake
+      this.ctx.fillStyle = '#778da9';
+      this.ctx.fillRect(36, -5, 4, 10);
+      // High-power scope
+      this.ctx.fillStyle = '#0d1b2a';
+      this.ctx.fillRect(6, -8, 16, 5);
+      this.ctx.fillStyle = '#00f3ff';
+      this.ctx.shadowColor = '#00f3ff';
+      this.ctx.shadowBlur = 6;
+      this.ctx.fillRect(21, -7.5, 2, 4); // lens glint
+    } else if (slot.weapon === 'tesla_coil') {
+      // Tesla Coil generator
+      this.ctx.fillStyle = '#8d5b4c';
+      this.ctx.fillRect(0, -6, 10, 12); // bronze base
+      // Copper coil windings
+      for (let c = 0; c < 4; c++) {
+        this.ctx.fillStyle = c % 2 === 0 ? '#d4a373' : '#b08968';
+        this.ctx.fillRect(10 + c * 4, -4.5, 3.5, 9);
+      }
+      // Top electrode sphere with electricity
+      this.ctx.shadowColor = '#00f3ff';
+      this.ctx.shadowBlur = 12;
+      this.ctx.fillStyle = '#e0e1dd';
+      this.ctx.beginPath();
+      this.ctx.arc(30, 0, 7, 0, Math.PI * 2);
+      this.ctx.fill();
+      // Spark arcs
+      const charge = Math.min(1.0, slot.timer / stats.interval);
+      if (charge > 0.35 && Math.random() < charge) {
+        this.ctx.strokeStyle = '#00f3ff';
+        this.ctx.lineWidth = 1.5;
+        this.ctx.beginPath();
+        this.ctx.moveTo(30, 0);
+        this.ctx.lineTo(34 + Math.random() * 8, (Math.random() - 0.5) * 12);
+        this.ctx.stroke();
+      }
+    } else if (slot.weapon === 'buzz_saw') {
+      // Buzz saw launcher casing
+      this.ctx.fillStyle = '#343a40';
+      this.ctx.fillRect(0, -7, 26, 14);
+      // Hazard stripes
+      this.ctx.fillStyle = '#ffb703';
+      this.ctx.fillRect(6, -6, 4, 12);
+      this.ctx.fillRect(14, -6, 4, 12);
+      // Loaded saw blade tip ready in launcher
+      this.ctx.fillStyle = '#adb5bd';
+      this.ctx.beginPath();
+      this.ctx.arc(26, 0, 8, -Math.PI / 2, Math.PI / 2);
+      this.ctx.fill();
     } else if (slot.weapon === 'railgun') {
       // Godly railgun glowing chassis
       this.ctx.shadowColor = '#00f3ff';
@@ -1521,6 +2587,48 @@ class GameEngine {
 
   drawProjectiles() {
     for (let p of this.projectiles) {
+      if (p.type === 'saw') {
+        this.ctx.save();
+        this.ctx.translate(p.x, p.y);
+        this.ctx.rotate(p.rotAngle || 0);
+
+        // Steel circular blade
+        this.ctx.shadowColor = '#ffd166';
+        this.ctx.shadowBlur = 10;
+        this.ctx.fillStyle = '#ced4da';
+        this.ctx.beginPath();
+        this.ctx.arc(0, 0, p.radius, 0, Math.PI * 2);
+        this.ctx.fill();
+
+        // Sharp spinning saw teeth
+        const numTeeth = 10;
+        this.ctx.fillStyle = '#f8f9fa';
+        for (let t = 0; t < numTeeth; t++) {
+          const a = (Math.PI * 2 * t) / numTeeth;
+          this.ctx.beginPath();
+          this.ctx.moveTo(Math.cos(a) * p.radius, Math.sin(a) * p.radius);
+          this.ctx.lineTo(Math.cos(a + 0.18) * (p.radius + 6), Math.sin(a + 0.18) * (p.radius + 6));
+          this.ctx.lineTo(Math.cos(a + 0.35) * p.radius, Math.sin(a + 0.35) * p.radius);
+          this.ctx.closePath();
+          this.ctx.fill();
+        }
+
+        // Dark metal inner plate
+        this.ctx.fillStyle = '#495057';
+        this.ctx.beginPath();
+        this.ctx.arc(0, 0, p.radius * 0.5, 0, Math.PI * 2);
+        this.ctx.fill();
+
+        // Center hub
+        this.ctx.fillStyle = '#e63946';
+        this.ctx.beginPath();
+        this.ctx.arc(0, 0, p.radius * 0.25, 0, Math.PI * 2);
+        this.ctx.fill();
+
+        this.ctx.restore();
+        continue;
+      }
+
       this.ctx.save();
       this.ctx.shadowColor = p.color;
       this.ctx.shadowBlur = 10;
@@ -1553,10 +2661,41 @@ class GameEngine {
     }
   }
 
+  drawLightningArcs() {
+    for (let arc of this.lightningArcs) {
+      const alpha = arc.lifetime / arc.maxLifetime;
+      if (arc.points.length < 2) continue;
+
+      this.ctx.save();
+      this.ctx.shadowColor = arc.color;
+      this.ctx.shadowBlur = 16;
+      this.ctx.strokeStyle = arc.color;
+      this.ctx.globalAlpha = Math.max(0, alpha);
+      this.ctx.lineWidth = 3.5;
+      this.ctx.lineJoin = 'round';
+      this.ctx.beginPath();
+      this.ctx.moveTo(arc.points[0].x, arc.points[0].y);
+      for (let p of arc.points) {
+        this.ctx.lineTo(p.x, p.y);
+      }
+      this.ctx.stroke();
+
+      // Bright white inner core
+      this.ctx.strokeStyle = `rgba(255, 255, 255, ${alpha * 0.95})`;
+      this.ctx.lineWidth = 1.4;
+      this.ctx.stroke();
+      this.ctx.restore();
+    }
+  }
+
   drawEnemies() {
     for (let e of this.enemies) {
       this.ctx.save();
       this.ctx.translate(e.x, e.y);
+
+      // Apply cloaking/phasing alpha
+      const renderAlpha = (e.cloakAlpha || 1.0) * (e.phaseAlpha || 1.0);
+      this.ctx.globalAlpha = renderAlpha;
 
       // Flash white when hit
       if (e.hitFlash > 0) {
@@ -1573,7 +2712,6 @@ class GameEngine {
         this.ctx.beginPath();
         this.ctx.ellipse(0, 0, r * 1.2, r * 0.8, 0, 0, Math.PI * 2);
         this.ctx.fill();
-        // Speed spikes
         this.ctx.fillStyle = '#ff9e00';
         this.ctx.fillRect(r * 0.2, -r * 1.1, 4, r * 0.8);
       } else if (e.type === 'armored') {
@@ -1591,16 +2729,222 @@ class GameEngine {
         this.ctx.beginPath();
         this.ctx.arc(r * 0.3, -r * 0.3, r * 0.4, 0, Math.PI * 2);
         this.ctx.fill();
+      } else if (e.type === 'swarm_drone') {
+        // Tiny diamond-shaped drone with flicker
+        this.ctx.rotate(performance.now() / 200);
+        this.ctx.beginPath();
+        this.ctx.moveTo(0, -r);
+        this.ctx.lineTo(r, 0);
+        this.ctx.lineTo(0, r);
+        this.ctx.lineTo(-r, 0);
+        this.ctx.closePath();
+        this.ctx.fill();
+        // Tiny thruster glow
+        this.ctx.fillStyle = '#00b4d8';
+        this.ctx.beginPath();
+        this.ctx.arc(0, 0, r * 0.35, 0, Math.PI * 2);
+        this.ctx.fill();
+      } else if (e.type === 'poison_crawler') {
+        // Slimy green body with dripping poison
+        this.ctx.beginPath();
+        this.ctx.arc(0, 0, r, 0, Math.PI * 2);
+        this.ctx.fill();
+        // Poison drip droplets
+        this.ctx.fillStyle = '#2d6a4f';
+        const dripY = r + Math.sin(performance.now() / 300) * 4;
+        this.ctx.beginPath();
+        this.ctx.arc(-r * 0.3, dripY * 0.4, 3, 0, Math.PI * 2);
+        this.ctx.fill();
+        this.ctx.beginPath();
+        this.ctx.arc(r * 0.2, dripY * 0.6, 2.5, 0, Math.PI * 2);
+        this.ctx.fill();
+        // Skull icon on body
+        this.ctx.fillStyle = '#d4f7d4';
+        this.ctx.font = `${Math.floor(r)}px sans-serif`;
+        this.ctx.textAlign = 'center';
+        this.ctx.fillText('☠', 0, r * 0.3);
+      } else if (e.type === 'shadow_stalker') {
+        // Ghostly triangular stealth shape
+        this.ctx.shadowColor = '#4a4e69';
+        this.ctx.shadowBlur = 8;
+        this.ctx.beginPath();
+        this.ctx.moveTo(r, 0);
+        this.ctx.lineTo(-r, -r * 0.8);
+        this.ctx.lineTo(-r * 0.4, 0);
+        this.ctx.lineTo(-r, r * 0.8);
+        this.ctx.closePath();
+        this.ctx.fill();
+        // Dagger-like edges
+        this.ctx.strokeStyle = '#9a8c98';
+        this.ctx.lineWidth = 1;
+        this.ctx.stroke();
+      } else if (e.type === 'berserker') {
+        // Muscular spiked body — gets bigger visual glow at low HP
+        const rageGlow = (1 - e.hp / e.maxHp);
+        if (rageGlow > 0.3) {
+          this.ctx.shadowColor = '#ff0000';
+          this.ctx.shadowBlur = 10 + rageGlow * 20;
+        }
+        this.ctx.beginPath();
+        this.ctx.arc(0, 0, r, 0, Math.PI * 2);
+        this.ctx.fill();
+        // Rage spikes
+        this.ctx.fillStyle = '#fca311';
+        for (let a = 0; a < Math.PI * 2; a += Math.PI / 4) {
+          const spikeLen = r * 0.5 * (1 + rageGlow * 0.5);
+          this.ctx.fillRect(Math.cos(a) * r, Math.sin(a) * r, spikeLen, 3);
+        }
+      } else if (e.type === 'shield_bearer') {
+        // Rounded body with frontal shield arc
+        this.ctx.beginPath();
+        this.ctx.arc(0, 0, r, 0, Math.PI * 2);
+        this.ctx.fill();
+        // Draw shield (arc on left/front side)
+        if (e.shieldHp > 0) {
+          const shieldRatio = e.shieldHp / e.maxShieldHp;
+          this.ctx.strokeStyle = `rgba(69, 123, 157, ${0.4 + shieldRatio * 0.6})`;
+          this.ctx.lineWidth = 4 + shieldRatio * 3;
+          this.ctx.beginPath();
+          this.ctx.arc(0, 0, r + 5, -Math.PI * 0.6, Math.PI * 0.6);
+          this.ctx.stroke();
+          // Shield glow
+          this.ctx.shadowColor = '#a8dadc';
+          this.ctx.shadowBlur = 6;
+          this.ctx.strokeStyle = `rgba(168, 218, 220, ${shieldRatio * 0.8})`;
+          this.ctx.lineWidth = 2;
+          this.ctx.stroke();
+        }
+      } else if (e.type === 'necromancer') {
+        // Hooded caster with swirling dark energy
+        // Body - hooded robe shape
+        this.ctx.beginPath();
+        this.ctx.moveTo(0, -r);
+        this.ctx.lineTo(r * 0.8, r * 0.6);
+        this.ctx.lineTo(-r * 0.8, r * 0.6);
+        this.ctx.closePath();
+        this.ctx.fill();
+        // Dark energy orb
+        this.ctx.fillStyle = '#e040fb';
+        this.ctx.shadowColor = '#e040fb';
+        this.ctx.shadowBlur = 10;
+        this.ctx.beginPath();
+        this.ctx.arc(0, -r * 0.1, r * 0.3, 0, Math.PI * 2);
+        this.ctx.fill();
+        // Swirling particles visual
+        const orbAngle = performance.now() / 500;
+        this.ctx.fillStyle = '#ce93d8';
+        this.ctx.beginPath();
+        this.ctx.arc(Math.cos(orbAngle) * r * 0.5, Math.sin(orbAngle) * r * 0.5, 2, 0, Math.PI * 2);
+        this.ctx.fill();
+        this.ctx.beginPath();
+        this.ctx.arc(Math.cos(orbAngle + 2) * r * 0.5, Math.sin(orbAngle + 2) * r * 0.5, 2, 0, Math.PI * 2);
+        this.ctx.fill();
       } else if (e.type === 'tank' || e.type === 'boss') {
         // Massive hulking body with spikes
         this.ctx.beginPath();
         this.ctx.arc(0, 0, r, 0, Math.PI * 2);
         this.ctx.fill();
-        // Heavy spikes
         this.ctx.fillStyle = '#590d22';
         for (let a = 0; a < Math.PI * 2; a += Math.PI / 3) {
           this.ctx.fillRect(Math.cos(a) * r, Math.sin(a) * r, 6, 6);
         }
+      } else if (e.type === 'doom_colossus') {
+        // Enormous rocky golem with glowing cracks
+        this.ctx.shadowColor = '#ff6b35';
+        this.ctx.shadowBlur = 15;
+        // Rocky body
+        this.ctx.beginPath();
+        this.ctx.arc(0, 0, r, 0, Math.PI * 2);
+        this.ctx.fill();
+        // Glowing magma cracks
+        this.ctx.strokeStyle = '#ff6b35';
+        this.ctx.lineWidth = 2;
+        this.ctx.beginPath();
+        this.ctx.moveTo(-r * 0.5, -r * 0.5);
+        this.ctx.lineTo(0, 0);
+        this.ctx.lineTo(r * 0.3, -r * 0.3);
+        this.ctx.stroke();
+        this.ctx.beginPath();
+        this.ctx.moveTo(-r * 0.2, r * 0.4);
+        this.ctx.lineTo(r * 0.1, 0);
+        this.ctx.lineTo(r * 0.5, r * 0.2);
+        this.ctx.stroke();
+        // Heavy boulder shoulders
+        this.ctx.fillStyle = '#8B4513';
+        this.ctx.beginPath();
+        this.ctx.arc(-r * 0.7, -r * 0.3, r * 0.35, 0, Math.PI * 2);
+        this.ctx.fill();
+        this.ctx.beginPath();
+        this.ctx.arc(r * 0.7, -r * 0.3, r * 0.35, 0, Math.PI * 2);
+        this.ctx.fill();
+      } else if (e.type === 'phantom_overlord') {
+        // Ethereal floating specter with phasing effect
+        this.ctx.shadowColor = '#9b5de5';
+        this.ctx.shadowBlur = 20;
+        // Ghostly body
+        this.ctx.beginPath();
+        this.ctx.arc(0, -r * 0.2, r * 0.8, 0, Math.PI);
+        this.ctx.lineTo(-r * 0.8, r * 0.6);
+        // Wavy bottom edge
+        for (let wx = -r * 0.8; wx <= r * 0.8; wx += r * 0.3) {
+          this.ctx.quadraticCurveTo(wx + r * 0.15, r * 0.9, wx + r * 0.3, r * 0.6);
+        }
+        this.ctx.closePath();
+        this.ctx.fill();
+        // Eerie glowing eyes
+        this.ctx.fillStyle = '#e040fb';
+        this.ctx.shadowColor = '#e040fb';
+        this.ctx.shadowBlur = 8;
+        this.ctx.beginPath();
+        this.ctx.arc(-r * 0.25, -r * 0.2, r * 0.12, 0, Math.PI * 2);
+        this.ctx.fill();
+        this.ctx.beginPath();
+        this.ctx.arc(r * 0.15, -r * 0.2, r * 0.12, 0, Math.PI * 2);
+        this.ctx.fill();
+      } else if (e.type === 'inferno_wyrm') {
+        // Massive fire dragon/serpent
+        this.ctx.shadowColor = '#ff4800';
+        this.ctx.shadowBlur = 20;
+        // Serpentine body
+        this.ctx.beginPath();
+        this.ctx.ellipse(0, 0, r, r * 0.7, 0, 0, Math.PI * 2);
+        this.ctx.fill();
+        // Flame scales pattern
+        this.ctx.fillStyle = '#ffaa00';
+        for (let s = -r * 0.6; s < r * 0.6; s += r * 0.3) {
+          this.ctx.beginPath();
+          this.ctx.moveTo(s, -r * 0.5);
+          this.ctx.lineTo(s + r * 0.15, -r * 0.8);
+          this.ctx.lineTo(s + r * 0.3, -r * 0.5);
+          this.ctx.fill();
+        }
+        // Wings
+        this.ctx.fillStyle = 'rgba(255, 72, 0, 0.6)';
+        this.ctx.beginPath();
+        this.ctx.moveTo(-r * 0.3, -r * 0.3);
+        this.ctx.lineTo(-r * 1.2, -r * 1.0);
+        this.ctx.lineTo(-r * 0.1, -r * 0.1);
+        this.ctx.fill();
+        this.ctx.beginPath();
+        this.ctx.moveTo(r * 0.3, -r * 0.3);
+        this.ctx.lineTo(r * 1.2, -r * 1.0);
+        this.ctx.lineTo(r * 0.1, -r * 0.1);
+        this.ctx.fill();
+        // Flaming eyes
+        this.ctx.fillStyle = '#fff';
+        this.ctx.shadowColor = '#ffaa00';
+        this.ctx.shadowBlur = 10;
+        this.ctx.beginPath();
+        this.ctx.arc(-r * 0.3, -r * 0.15, r * 0.12, 0, Math.PI * 2);
+        this.ctx.fill();
+        this.ctx.beginPath();
+        this.ctx.arc(r * 0.1, -r * 0.15, r * 0.12, 0, Math.PI * 2);
+        this.ctx.fill();
+        // Jaw / mouth
+        this.ctx.fillStyle = '#8B0000';
+        this.ctx.beginPath();
+        this.ctx.arc(-r * 0.1, r * 0.2, r * 0.25, 0, Math.PI);
+        this.ctx.fill();
       } else {
         // Default Scout crawler
         this.ctx.beginPath();
@@ -1608,15 +2952,23 @@ class GameEngine {
         this.ctx.fill();
       }
 
-      // Glowing evil eye
-      this.ctx.fillStyle = '#fff';
-      this.ctx.beginPath();
-      this.ctx.arc(-r * 0.3, -r * 0.2, r * 0.25, 0, Math.PI * 2);
-      this.ctx.fill();
-      this.ctx.fillStyle = '#ff0054';
-      this.ctx.beginPath();
-      this.ctx.arc(-r * 0.35, -r * 0.2, r * 0.12, 0, Math.PI * 2);
-      this.ctx.fill();
+      this.ctx.shadowBlur = 0;
+      this.ctx.globalAlpha = renderAlpha;
+
+      // Glowing evil eye (skip for types that have custom eyes)
+      if (!['swarm_drone', 'phantom_overlord', 'inferno_wyrm', 'necromancer'].includes(e.type)) {
+        this.ctx.fillStyle = '#fff';
+        this.ctx.beginPath();
+        this.ctx.arc(-r * 0.3, -r * 0.2, r * 0.25, 0, Math.PI * 2);
+        this.ctx.fill();
+        this.ctx.fillStyle = '#ff0054';
+        this.ctx.beginPath();
+        this.ctx.arc(-r * 0.35, -r * 0.2, r * 0.12, 0, Math.PI * 2);
+        this.ctx.fill();
+      }
+
+      // Reset alpha for UI elements
+      this.ctx.globalAlpha = 1.0;
 
       // Enemy Name & HP text
       this.ctx.font = '600 10px Chakra Petch';
@@ -1634,6 +2986,28 @@ class GameEngine {
       this.ctx.fillStyle = '#ff3366';
       this.ctx.fillRect(-hpWidth / 2, -r - 9, hpWidth * hpPercent, hpHeight);
 
+      // Shield bar (below HP bar) for shield bearers
+      if (e.maxShieldHp > 0 && e.shieldHp > 0) {
+        const shieldPercent = e.shieldHp / e.maxShieldHp;
+        this.ctx.fillStyle = 'rgba(0,0,0,0.5)';
+        this.ctx.fillStyle = '#a8dadc';
+        this.ctx.fillRect(-hpWidth / 2, -r - 4, hpWidth * shieldPercent, 3);
+      }
+
+      // Frost slow aura (from Graviton Hammer)
+      if (e.slowTimer > 0) {
+        this.ctx.save();
+        this.ctx.strokeStyle = '#00f3ff';
+        this.ctx.shadowColor = '#00f3ff';
+        this.ctx.shadowBlur = 8;
+        this.ctx.lineWidth = 2;
+        this.ctx.setLineDash([4, 4]);
+        this.ctx.beginPath();
+        this.ctx.arc(0, 0, r + 5, 0, Math.PI * 2);
+        this.ctx.stroke();
+        this.ctx.restore();
+      }
+
       this.ctx.restore();
     }
   }
@@ -1642,11 +3016,23 @@ class GameEngine {
     for (let pt of this.particles) {
       const alpha = pt.life / pt.maxLife;
       this.ctx.save();
-      this.ctx.fillStyle = pt.color;
-      this.ctx.globalAlpha = Math.max(0, alpha);
-      this.ctx.beginPath();
-      this.ctx.arc(pt.x, pt.y, pt.radius, 0, Math.PI * 2);
-      this.ctx.fill();
+      if (pt.isRing) {
+        const currentR = pt.radius * (1 - alpha * 0.7);
+        this.ctx.strokeStyle = pt.color;
+        this.ctx.shadowColor = pt.color;
+        this.ctx.shadowBlur = 14;
+        this.ctx.globalAlpha = Math.max(0, alpha);
+        this.ctx.lineWidth = 4 * alpha;
+        this.ctx.beginPath();
+        this.ctx.arc(pt.x, pt.y, currentR, 0, Math.PI * 2);
+        this.ctx.stroke();
+      } else {
+        this.ctx.fillStyle = pt.color;
+        this.ctx.globalAlpha = Math.max(0, alpha);
+        this.ctx.beginPath();
+        this.ctx.arc(pt.x, pt.y, pt.radius, 0, Math.PI * 2);
+        this.ctx.fill();
+      }
       this.ctx.restore();
     }
   }

@@ -58,7 +58,83 @@ class SoundManager {
       gain.gain.linearRampToValueAtTime(0.01, t + 0.45);
       osc.start(t);
       osc.stop(t + 0.45);
+    } else if (type === 'sniper') {
+      // Powerful sniper gunshot crack + low boom
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(1400, t);
+      osc.frequency.exponentialRampToValueAtTime(80, t + 0.22);
+      gain.gain.setValueAtTime(0.38, t);
+      gain.gain.linearRampToValueAtTime(0.01, t + 0.22);
+      osc.start(t);
+      osc.stop(t + 0.22);
     }
+  }
+
+  playTesla() {
+    if (this.muted) return;
+    this.init();
+    const t = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(880 + (Math.random() * 400), t);
+    osc.frequency.exponentialRampToValueAtTime(120, t + 0.18);
+    gain.gain.setValueAtTime(0.18, t);
+    gain.gain.linearRampToValueAtTime(0.01, t + 0.18);
+    osc.connect(gain);
+    gain.connect(this.ctx.destination);
+    osc.start(t);
+    osc.stop(t + 0.18);
+  }
+
+  playSaw() {
+    if (this.muted) return;
+    this.init();
+    const t = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(420 + Math.random() * 60, t);
+    osc.frequency.linearRampToValueAtTime(280, t + 0.1);
+    gain.gain.setValueAtTime(0.1, t);
+    gain.gain.linearRampToValueAtTime(0.01, t + 0.1);
+    osc.connect(gain);
+    gain.connect(this.ctx.destination);
+    osc.start(t);
+    osc.stop(t + 0.1);
+  }
+
+  playHammer() {
+    if (this.muted) return;
+    this.init();
+    const t = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(220, t);
+    osc.frequency.exponentialRampToValueAtTime(30, t + 0.5);
+    gain.gain.setValueAtTime(0.45, t);
+    gain.gain.linearRampToValueAtTime(0.01, t + 0.5);
+    osc.connect(gain);
+    gain.connect(this.ctx.destination);
+    osc.start(t);
+    osc.stop(t + 0.5);
+  }
+
+  playVoid() {
+    if (this.muted) return;
+    this.init();
+    const t = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(140 + Math.sin(t * 15) * 40, t);
+    gain.gain.setValueAtTime(0.06, t);
+    gain.gain.linearRampToValueAtTime(0.01, t + 0.12);
+    osc.connect(gain);
+    gain.connect(this.ctx.destination);
+    osc.start(t);
+    osc.stop(t + 0.12);
   }
 
   playExplosion() {

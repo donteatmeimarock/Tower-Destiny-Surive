@@ -1323,7 +1323,7 @@ class GameEngine {
         enemy.fireBreathTimer -= dt;
         if (enemy.fireBreathTimer <= 0) {
           enemy.fireBreathTimer = enemy.fireBreathInterval;
-          const fireDmg = 25 + this.wave * 4;
+          const fireDmg = 50;
           this.towerHp -= fireDmg;
           // Fire breath particle spray
           for (let f = 0; f < 20; f++) {

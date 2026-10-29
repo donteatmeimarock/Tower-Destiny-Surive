@@ -1419,3 +1419,16 @@ body {
 .mt-8 { margin-top: 8px; }
 .mt-12 { margin-top: 12px; }
 
+.speed-active-20x {
+  background: rgba(0, 243, 255, 0.25) !important;
+  box-shadow: 0 0 12px rgba(0, 243, 255, 0.7) !important;
+  text-shadow: 0 0 6px #00f3ff;
+}
+
+.speed-active-100x {
+  background: linear-gradient(135deg, rgba(255, 0, 127, 0.4), rgba(121, 40, 202, 0.4)) !important;
+  box-shadow: 0 0 18px rgba(255, 0, 255, 0.85) !important;
+  text-shadow: 0 0 8px #ff00ff;
+  animation: cosmicTextGlow 1.8s infinite alternate;
+}
+

@@ -133,26 +133,15 @@ class GameEngine {
       this.mouseY = (e.clientY - rect.top) * scaleY;
     });
 
-    // Speed button: 1x -> 2x -> 5x -> 10x cycle
+    // Speed button: 1x -> 2x -> 5x -> 10x -> 20x -> 100x cycle
     const speedBtn = document.getElementById('speed-btn');
     speedBtn.addEventListener('click', () => {
-      if (this.gameSpeed === 1) {
-        this.gameSpeed = 2;
-        speedBtn.innerText = '2x ⏩';
-        speedBtn.style.color = '#00ff88';
-      } else if (this.gameSpeed === 2) {
-        this.gameSpeed = 5;
-        speedBtn.innerText = '5x ⏩⏩';
-        speedBtn.style.color = '#ffb703';
-      } else if (this.gameSpeed === 5) {
-        this.gameSpeed = 10;
-        speedBtn.innerText = '10x 🚀⚡';
-        speedBtn.style.color = '#ff007f';
-      } else {
-        this.gameSpeed = 1;
-        speedBtn.innerText = '1x ⏩';
-        speedBtn.style.color = '#fff';
-      }
+      if (this.gameSpeed === 1) this.setGameSpeed(2);
+      else if (this.gameSpeed === 2) this.setGameSpeed(5);
+      else if (this.gameSpeed === 5) this.setGameSpeed(10);
+      else if (this.gameSpeed === 10) this.setGameSpeed(20);
+      else if (this.gameSpeed === 20) this.setGameSpeed(100);
+      else this.setGameSpeed(1);
     });
 
     // Pause button
@@ -462,6 +451,59 @@ class GameEngine {
           this.addDamageText(this.towerBaseX + 35, this.groundY - 140, `⏩ JUMPED TO WAVE ${targetWave}!`, '#00f3ff');
         }
       });
+    }
+
+    // 20x and 100x Speed Admin Buttons
+    const speed20Btn = document.getElementById('admin-speed-20x-btn');
+    if (speed20Btn) {
+      speed20Btn.addEventListener('click', () => {
+        this.setGameSpeed(20);
+        this.addDamageText(this.towerBaseX + 35, this.groundY - 140, '⚡ 20x GAME SPEED!', '#00f3ff');
+      });
+    }
+
+    const speed100Btn = document.getElementById('admin-speed-100x-btn');
+    if (speed100Btn) {
+      speed100Btn.addEventListener('click', () => {
+        this.setGameSpeed(100);
+        this.addDamageText(this.towerBaseX + 35, this.groundY - 140, '🌌 100x WARP SPEED!', '#ff00ff');
+      });
+    }
+  }
+
+  setGameSpeed(speed) {
+    this.gameSpeed = speed;
+    const speedBtn = document.getElementById('speed-btn');
+    if (!speedBtn) return;
+
+    speedBtn.classList.remove('speed-active-20x', 'speed-active-100x');
+    if (this.gameSpeed === 2) {
+      speedBtn.innerText = '2x ⏩';
+      speedBtn.style.color = '#00ff88';
+      speedBtn.style.borderColor = 'rgba(0, 255, 136, 0.4)';
+    } else if (this.gameSpeed === 5) {
+      speedBtn.innerText = '5x ⏩⏩';
+      speedBtn.style.color = '#ffb703';
+      speedBtn.style.borderColor = 'rgba(255, 183, 3, 0.4)';
+    } else if (this.gameSpeed === 10) {
+      speedBtn.innerText = '10x 🚀⚡';
+      speedBtn.style.color = '#ff007f';
+      speedBtn.style.borderColor = 'rgba(255, 0, 127, 0.5)';
+    } else if (this.gameSpeed === 20) {
+      speedBtn.innerText = '20x 💥⚡';
+      speedBtn.style.color = '#00f3ff';
+      speedBtn.style.borderColor = '#00f3ff';
+      speedBtn.classList.add('speed-active-20x');
+    } else if (this.gameSpeed === 100) {
+      speedBtn.innerText = '100x 🌌🔥';
+      speedBtn.style.color = '#ff00ff';
+      speedBtn.style.borderColor = '#ff00ff';
+      speedBtn.classList.add('speed-active-100x');
+    } else {
+      this.gameSpeed = 1;
+      speedBtn.innerText = '1x ⏩';
+      speedBtn.style.color = '#fff';
+      speedBtn.style.borderColor = 'rgba(0, 243, 255, 0.3)';
     }
   }
 
@@ -1689,8 +1731,11 @@ class GameEngine {
 
     if (!this.isPaused && !this.gameOver) {
       if (this.gameSpeed > 2) {
-        // Substep physics simulation for 5x and 10x to ensure bullet collisions & ticks remain perfectly accurate
-        const steps = this.gameSpeed === 10 ? 4 : 2;
+        // Substep physics simulation for 5x, 10x, 20x, and 100x to ensure bullet collisions & ticks remain perfectly accurate
+        let steps = 2;
+        if (this.gameSpeed === 10) steps = 4;
+        else if (this.gameSpeed === 20) steps = 6;
+        else if (this.gameSpeed === 100) steps = 12;
         const subDt = (baseDt * this.gameSpeed) / steps;
         for (let s = 0; s < steps; s++) {
           this.update(subDt);

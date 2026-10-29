@@ -29,6 +29,25 @@ class GameEngine {
     this.overlaySub = document.getElementById('overlay-sub');
     this.overlayActionBtn = document.getElementById('overlay-action-btn');
 
+    // Admin Panel State & UI Elements
+    this.isAdminAuthenticated = false;
+    this.godMode = false;
+    this.adminTargetSlot = 0;
+    this.adminSelectedLevel = 0;
+
+    this.adminBtn = document.getElementById('admin-btn');
+    this.adminAuthModal = document.getElementById('admin-auth-modal');
+    this.adminPassInput = document.getElementById('admin-pass-input');
+    this.adminSubmitPassBtn = document.getElementById('admin-submit-pass-btn');
+    this.adminAuthCloseBtn = document.getElementById('admin-auth-close-btn');
+    this.adminAuthError = document.getElementById('admin-auth-error');
+    this.adminPanelModal = document.getElementById('admin-panel-modal');
+    this.adminPanelCloseBtn = document.getElementById('admin-panel-close-btn');
+    this.adminWeaponSelect = document.getElementById('admin-weapon-select');
+    this.adminTargetSlotName = document.getElementById('admin-target-slot-name');
+    this.adminTargetSlotWep = document.getElementById('admin-target-slot-wep');
+    this.adminGodModeBtn = document.getElementById('admin-god-mode-btn');
+
     // Game State
     this.coins = 20; // Starting bonus for comfort
     this.hasBoughtFirstTurret = false;
@@ -68,6 +87,7 @@ class GameEngine {
     this.damageNumbers = [];
     this.beams = []; // railgun laser beams
     this.lightningArcs = []; // tesla coil chain lightning arcs
+    this.plasmaPools = []; // orbital mortar lingering plasma pools
     this.cameraShake = 0; // camera shake timer
 
     // Spawning waves
@@ -83,6 +103,8 @@ class GameEngine {
     this.mouseY = 300;
 
     this.initEventListeners();
+    this.populateAdminWeaponSelect();
+    this.initAdminEventListeners();
     this.renderCrateSlotsUI();
     this.renderShop();
     this.selectSlot(0);
@@ -168,6 +190,385 @@ class GameEngine {
         this.startWave(this.wave + 1);
       }
     });
+  }
+
+  // ================= ADMIN PANEL METHODS ================= //
+  populateAdminWeaponSelect() {
+    if (!this.adminWeaponSelect) return;
+    this.adminWeaponSelect.innerHTML = '';
+
+    const categories = [
+      { key: 'gun', label: '🔫 Guns' },
+      { key: 'godly-gun', label: '⚡ Godly Guns' },
+      { key: 'melee', label: '⚔️ Close Range' },
+      { key: 'godly-melee', label: '🌟 Godly Close Range' }
+    ];
+
+    categories.forEach(cat => {
+      const group = document.createElement('optgroup');
+      group.label = cat.label;
+      for (const [id, wep] of Object.entries(WEAPON_REGISTRY)) {
+        if (wep.category === cat.key) {
+          const opt = document.createElement('option');
+          opt.value = id;
+          opt.textContent = `${wep.icon} ${wep.name} (Max Lv.${wep.maxUpgrades})`;
+          group.appendChild(opt);
+        }
+      }
+      this.adminWeaponSelect.appendChild(group);
+    });
+  }
+
+  initAdminEventListeners() {
+    if (!this.adminBtn) return;
+
+    // Open Admin Button (prompts for password [adminpanel123] if not authenticated)
+    this.adminBtn.addEventListener('click', () => {
+      if (this.isAdminAuthenticated) {
+        this.openAdminPanel();
+      } else {
+        this.openAdminAuthModal();
+      }
+    });
+
+    // Submit password button
+    this.adminSubmitPassBtn.addEventListener('click', () => {
+      this.verifyAdminPassword();
+    });
+
+    // Enter key inside password input
+    this.adminPassInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        this.verifyAdminPassword();
+      }
+    });
+
+    // Close Auth modal
+    this.adminAuthCloseBtn.addEventListener('click', () => {
+      this.adminAuthModal.classList.add('hidden');
+    });
+
+    // Close Admin Panel modal
+    this.adminPanelCloseBtn.addEventListener('click', () => {
+      this.adminPanelModal.classList.add('hidden');
+    });
+
+    // Quick Coin buttons
+    const coinBtns = document.querySelectorAll('.coin-add-btn');
+    coinBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const amt = parseInt(btn.dataset.coins) || 1000;
+        this.adminAddCoins(amt);
+      });
+    });
+
+    // Custom Coin button
+    const customCoinBtn = document.getElementById('give-custom-coins-btn');
+    const customCoinInput = document.getElementById('custom-coins-input');
+    if (customCoinBtn && customCoinInput) {
+      customCoinBtn.addEventListener('click', () => {
+        const val = parseInt(customCoinInput.value) || 0;
+        if (val > 0) {
+          this.adminAddCoins(val);
+        }
+      });
+    }
+
+    // Heal Tower
+    const healBtn = document.getElementById('admin-max-hp-btn');
+    if (healBtn) {
+      healBtn.addEventListener('click', () => {
+        this.towerHp = this.maxTowerHp;
+        this.updateHUD();
+        window.soundManager.playUpgrade();
+        this.addDamageText(this.towerBaseX + 35, this.groundY - 140, '❤️ FULLY HEALED!', '#00ff88');
+      });
+    }
+
+    // God Mode Toggle
+    if (this.adminGodModeBtn) {
+      this.adminGodModeBtn.addEventListener('click', () => {
+        this.godMode = !this.godMode;
+        if (this.godMode) {
+          this.adminGodModeBtn.textContent = '🛡️ God Mode: ON';
+          this.adminGodModeBtn.classList.add('active');
+          this.addDamageText(this.towerBaseX + 35, this.groundY - 140, '🛡️ GOD MODE ACTIVATED', '#ff007f');
+        } else {
+          this.adminGodModeBtn.textContent = '🛡️ God Mode: OFF';
+          this.adminGodModeBtn.classList.remove('active');
+          this.addDamageText(this.towerBaseX + 35, this.groundY - 140, '🛡️ God Mode Disabled', '#8ca0ba');
+        }
+      });
+    }
+
+    // Target Slot Selector Chips
+    const slotChips = document.querySelectorAll('.admin-slot-chip');
+    slotChips.forEach(chip => {
+      chip.addEventListener('click', () => {
+        slotChips.forEach(c => c.classList.remove('active'));
+        chip.classList.add('active');
+        this.adminTargetSlot = parseInt(chip.dataset.slot) || 0;
+        this.updateAdminPanelSlotView();
+      });
+    });
+
+    // Force Equip Button (allows placing weapons you didn't buy into crates)
+    const forceEquipBtn = document.getElementById('admin-force-equip-btn');
+    if (forceEquipBtn) {
+      forceEquipBtn.addEventListener('click', () => {
+        this.adminForceEquip();
+      });
+    }
+
+    // Clear Slot Button
+    const clearSlotBtn = document.getElementById('admin-clear-slot-btn');
+    if (clearSlotBtn) {
+      clearSlotBtn.addEventListener('click', () => {
+        this.adminClearSlot();
+      });
+    }
+
+    // Level Chips (set upgrades)
+    const levelChips = document.querySelectorAll('.level-chip');
+    levelChips.forEach(chip => {
+      chip.addEventListener('click', () => {
+        levelChips.forEach(c => c.classList.remove('active'));
+        chip.classList.add('active');
+        const lvl = parseInt(chip.dataset.lvl) || 0;
+        this.adminSetLevel(lvl);
+      });
+    });
+
+    // Max Current Weapon Button
+    const maxCurrentBtn = document.getElementById('admin-max-current-wep-btn');
+    if (maxCurrentBtn) {
+      maxCurrentBtn.addEventListener('click', () => {
+        this.adminMaxTargetWeapon();
+      });
+    }
+
+    // Max All Weapons Button
+    const maxAllBtn = document.getElementById('admin-max-all-weps-btn');
+    if (maxAllBtn) {
+      maxAllBtn.addEventListener('click', () => {
+        this.adminMaxAllWeapons();
+      });
+    }
+
+    // SPAWN 1x1x1 SECRET BOSS Button
+    const spawn1x1x1Btn = document.getElementById('admin-spawn-1x1x1-btn');
+    if (spawn1x1x1Btn) {
+      spawn1x1x1Btn.addEventListener('click', () => {
+        this.adminSpawn1x1x1();
+      });
+    }
+
+    // Kill All Enemies Button
+    const killAllBtn = document.getElementById('admin-kill-all-btn');
+    if (killAllBtn) {
+      killAllBtn.addEventListener('click', () => {
+        this.adminKillAllEnemies();
+      });
+    }
+
+    // Force Next Wave Button
+    const nextWaveBtn = document.getElementById('admin-next-wave-btn');
+    if (nextWaveBtn) {
+      nextWaveBtn.addEventListener('click', () => {
+        this.enemies = [];
+        this.waveSpawnsRemaining = [];
+        this.startWave(this.wave + 1);
+        this.addDamageText(this.towerBaseX + 35, this.groundY - 140, `🌊 WAVE ${this.wave} STARTED!`, '#00f3ff');
+      });
+    }
+
+    // Jump Wave Button
+    const jumpWaveBtn = document.getElementById('admin-wave-jump-btn');
+    const jumpWaveInput = document.getElementById('admin-wave-jump-input');
+    if (jumpWaveBtn && jumpWaveInput) {
+      jumpWaveBtn.addEventListener('click', () => {
+        const targetWave = parseInt(jumpWaveInput.value) || 1;
+        if (targetWave >= 1) {
+          this.enemies = [];
+          this.waveSpawnsRemaining = [];
+          this.startWave(targetWave);
+          this.addDamageText(this.towerBaseX + 35, this.groundY - 140, `⏩ JUMPED TO WAVE ${targetWave}!`, '#00f3ff');
+        }
+      });
+    }
+  }
+
+  openAdminAuthModal() {
+    this.adminPassInput.value = '';
+    this.adminAuthError.classList.add('hidden');
+    this.adminAuthModal.classList.remove('hidden');
+    setTimeout(() => this.adminPassInput.focus(), 50);
+  }
+
+  verifyAdminPassword() {
+    const val = (this.adminPassInput.value || '').trim();
+    if (val === 'adminpanel123') {
+      this.isAdminAuthenticated = true;
+      this.adminAuthModal.classList.add('hidden');
+      this.adminAuthError.classList.add('hidden');
+      this.openAdminPanel();
+    } else {
+      this.adminAuthError.classList.remove('hidden');
+      this.adminPassInput.value = '';
+      this.adminPassInput.focus();
+    }
+  }
+
+  openAdminPanel() {
+    if (!this.isAdminAuthenticated) return;
+    this.adminPanelModal.classList.remove('hidden');
+    this.updateAdminPanelSlotView();
+  }
+
+  updateAdminPanelSlotView() {
+    const slot = this.slots[this.adminTargetSlot];
+    if (this.adminTargetSlotName) {
+      this.adminTargetSlotName.textContent = `Crate ${this.adminTargetSlot + 1}`;
+    }
+    if (this.adminTargetSlotWep) {
+      if (slot && slot.weapon) {
+        const wep = WEAPON_REGISTRY[slot.weapon];
+        const stars = '★'.repeat(slot.level);
+        this.adminTargetSlotWep.textContent = `${wep.icon} ${wep.name} (Lv.${slot.level} ${stars})`;
+        this.adminTargetSlotWep.style.color = '#00f3ff';
+      } else {
+        this.adminTargetSlotWep.textContent = 'Empty';
+        this.adminTargetSlotWep.style.color = '#8ca0ba';
+      }
+    }
+
+    // Update level chips
+    const levelChips = document.querySelectorAll('.level-chip');
+    levelChips.forEach(chip => {
+      const lvl = parseInt(chip.dataset.lvl);
+      if (slot && slot.weapon) {
+        chip.classList.toggle('active', lvl === slot.level);
+      } else {
+        chip.classList.toggle('active', lvl === this.adminSelectedLevel);
+      }
+    });
+  }
+
+  adminForceEquip() {
+    const weaponId = this.adminWeaponSelect ? this.adminWeaponSelect.value : null;
+    if (!weaponId || !WEAPON_REGISTRY[weaponId]) return;
+    const wep = WEAPON_REGISTRY[weaponId];
+    const slot = this.slots[this.adminTargetSlot];
+
+    slot.weapon = weaponId;
+    slot.level = Math.min(this.adminSelectedLevel, wep.maxUpgrades);
+    slot.timer = 0;
+    slot.subTimer = 0;
+
+    window.soundManager.playUpgrade();
+    this.updateHUD();
+    this.renderCrateSlotsUI();
+    this.updateInspector();
+    this.updateAdminPanelSlotView();
+
+    const coords = this.getSlotCoords(this.adminTargetSlot);
+    this.createExplosionParticles(coords.x + 30, coords.y, '#00f3ff', 25);
+    this.addDamageText(coords.x + 30, coords.y - 20, `⚡ EQUIPPED ${wep.name.toUpperCase()}!`, '#00f3ff');
+  }
+
+  adminClearSlot() {
+    const slot = this.slots[this.adminTargetSlot];
+    slot.weapon = null;
+    slot.level = 0;
+    slot.timer = 0;
+    slot.subTimer = 0;
+
+    window.soundManager.playCoin();
+    this.updateHUD();
+    this.renderCrateSlotsUI();
+    this.updateInspector();
+    this.updateAdminPanelSlotView();
+  }
+
+  adminSetLevel(lvl) {
+    this.adminSelectedLevel = lvl;
+    const slot = this.slots[this.adminTargetSlot];
+    if (slot && slot.weapon) {
+      const wep = WEAPON_REGISTRY[slot.weapon];
+      slot.level = Math.min(lvl, wep.maxUpgrades);
+      window.soundManager.playUpgrade();
+      this.updateHUD();
+      this.renderCrateSlotsUI();
+      this.updateInspector();
+    }
+    this.updateAdminPanelSlotView();
+  }
+
+  adminMaxTargetWeapon() {
+    const slot = this.slots[this.adminTargetSlot];
+    if (slot && slot.weapon) {
+      const wep = WEAPON_REGISTRY[slot.weapon];
+      slot.level = wep.maxUpgrades;
+      window.soundManager.playUpgrade();
+      this.updateHUD();
+      this.renderCrateSlotsUI();
+      this.updateInspector();
+      this.updateAdminPanelSlotView();
+      const coords = this.getSlotCoords(this.adminTargetSlot);
+      this.createExplosionParticles(coords.x + 30, coords.y, '#ffd166', 30);
+      this.addDamageText(coords.x + 30, coords.y - 20, '⭐ MAXED OUT!', '#ffd166');
+    }
+  }
+
+  adminMaxAllWeapons() {
+    let upgradedAny = false;
+    for (let i = 0; i < this.slots.length; i++) {
+      const slot = this.slots[i];
+      if (slot.weapon) {
+        const wep = WEAPON_REGISTRY[slot.weapon];
+        slot.level = wep.maxUpgrades;
+        upgradedAny = true;
+        const coords = this.getSlotCoords(i);
+        this.createExplosionParticles(coords.x + 30, coords.y, '#ff007f', 20);
+      }
+    }
+    if (upgradedAny) {
+      window.soundManager.playUpgrade();
+      this.updateHUD();
+      this.renderCrateSlotsUI();
+      this.updateInspector();
+      this.updateAdminPanelSlotView();
+      this.addDamageText(this.towerBaseX + 35, this.groundY - 180, '🌟 ALL 5 CRATES MAXED!', '#00f3ff');
+    }
+  }
+
+  adminAddCoins(amount) {
+    this.coins += amount;
+    window.soundManager.playCoin();
+    this.updateHUD();
+    this.updateInspector();
+    this.addDamageText(this.towerBaseX + 35, this.groundY - 140, `+${amount.toLocaleString()}🪙`, '#ffd166');
+  }
+
+  adminSpawn1x1x1() {
+    this.spawnEnemy('boss_1x1x1');
+    window.soundManager.playExplosion();
+    this.cameraShake = 0.3;
+    this.addDamageText(this.canvas.width - 150, this.groundY - 100, '👾 1x1x1 SPAWNED! (1,000🪙)', '#00f3ff');
+  }
+
+  adminKillAllEnemies() {
+    if (this.enemies.length === 0) return;
+    window.soundManager.playExplosion();
+    this.cameraShake = 0.25;
+    for (let enemy of this.enemies) {
+      this.coins += enemy.coinReward;
+      this.createExplosionParticles(enemy.x, enemy.y, enemy.color, 15);
+      this.addDamageText(enemy.x, enemy.y - 15, `+${enemy.coinReward}🪙`, '#ffd166');
+    }
+    this.enemies = [];
+    this.updateHUD();
+    this.updateInspector();
   }
 
   // Calculate current slot coordinates in world
@@ -281,6 +682,18 @@ class GameEngine {
       }
       if (currentStats.sawRadius) {
         statsHtml += `<span>Saw: <b>${currentStats.sawRadius}px</b></span>`;
+      }
+      if (currentStats.pellets) {
+        statsHtml += `<span>Pellets: <b>${currentStats.pellets}</b></span>`;
+      }
+      if (currentStats.poolDps) {
+        statsHtml += `<span>Pool: <b>${currentStats.poolDps}/s</b></span>`;
+      }
+      if (currentStats.giantBonus) {
+        statsHtml += `<span>Giant: <b>${currentStats.giantBonus}×</b></span>`;
+      }
+      if (currentStats.flareDamage) {
+        statsHtml += `<span>Nova: <b>${currentStats.flareDamage}</b></span>`;
       }
       this.inspectStatsGrid.innerHTML = statsHtml;
 
@@ -822,6 +1235,8 @@ class GameEngine {
     let fireBreathInterval = 0;
     let quakeTimer = 0;            // For doom colossus
     let quakeInterval = 0;
+    let glitchAttackTimer = 0;     // For 1x1x1 secret boss
+    let glitchAttackInterval = 0;
 
     if (type === 'scout') {
       hp = 5 + (this.wave > 1 ? (this.wave - 1) * 2 : 0);
@@ -984,12 +1399,30 @@ class GameEngine {
       attackRange = 200;
       fireBreathInterval = 6.0;
       fireBreathTimer = 4.0;
+    } else if (type === 'boss_1x1x1' || type === '1x1x1') {
+      // Secret 1x1x1 Boss - Glitch Corrupted Entity
+      hp = 3500 + this.wave * 500;
+      speed = 13;
+      size = 64;
+      coinReward = 1000; // Gives 1000 coins on defeat!
+      color = '#00f3ff';
+      name = '⬛ 1x1x1';
+      attackDamage = 50 + this.wave * 5;
+      attackInterval = 1.4;
+      attackRange = 250;
+      glitchAttackInterval = 4.0;
+      glitchAttackTimer = 2.0;
     }
 
     // Apply late-game scaling and blood moon
     hp = Math.floor(hp * lateScale * bloodMoonMult);
     attackDamage = Math.floor(attackDamage * lateScale * bloodMoonMult);
     coinReward = Math.floor(coinReward * lateScale);
+
+    // Guaranteed 1,000 coins for secret 1x1x1 boss
+    if (type === 'boss_1x1x1' || type === '1x1x1') {
+      coinReward = 1000;
+    }
 
     this.enemies.push({
       type: enemyType,
@@ -1021,6 +1454,10 @@ class GameEngine {
       fireBreathInterval: fireBreathInterval,
       quakeTimer: quakeTimer,
       quakeInterval: quakeInterval,
+      glitchAttackTimer: glitchAttackTimer,
+      glitchAttackInterval: glitchAttackInterval,
+      rot3d: 0,
+      floatOffset: 0,
       phaseAlpha: 1.0 // for phantom overlord phasing visual
     });
   }
@@ -1172,6 +1609,60 @@ class GameEngine {
         continue;
       }
 
+      // Mortar Shell (Orbital Mortar parabolic trajectory)
+      if (p.type === 'mortar') {
+        p.arcTime += dt;
+        const t = Math.min(1.0, p.arcTime / p.maxArcTime);
+        p.x = p.startX + (p.targetX - p.startX) * t;
+        const linearY = p.startY + (p.targetY - p.startY) * t;
+        const arcOffset = 4 * p.arcHeight * t * (1 - t);
+        p.y = linearY - arcOffset;
+
+        // Smoke and fiery spark trail
+        if (Math.random() < 0.6) {
+          this.particles.push({
+            x: p.x,
+            y: p.y,
+            vx: (Math.random() - 0.5) * 20,
+            vy: Math.random() * 15,
+            color: Math.random() > 0.4 ? '#ff7b00' : '#495057',
+            radius: 3 + Math.random() * 3,
+            life: 0.3,
+            maxLife: 0.3
+          });
+        }
+
+        if (t >= 1.0) {
+          this.cameraShake = 0.25;
+          window.soundManager.playExplosion();
+          this.createExplosionParticles(p.targetX, p.targetY, '#ff5400', 30);
+          this.createExplosionParticles(p.targetX, p.targetY, '#c77dff', 20);
+
+          // AoE blast damage
+          for (let e of this.enemies) {
+            const d = Math.hypot(e.x - p.targetX, e.y - p.targetY);
+            if (d <= p.blastRadius + e.size / 2) {
+              this.damageEnemy(e, p.damage, '#ff5400');
+            }
+          }
+
+          // Spawn lingering boiling plasma pool
+          this.plasmaPools.push({
+            x: p.targetX,
+            y: this.groundY,
+            radius: p.blastRadius * 0.75,
+            duration: p.poolDuration,
+            maxDuration: p.poolDuration,
+            dps: p.poolDps,
+            tickTimer: 0
+          });
+
+          this.projectiles.splice(i, 1);
+          continue;
+        }
+        continue;
+      }
+
       p.x += p.vx * dt;
       p.y += p.vy * dt;
       p.lifetime -= dt;
@@ -1224,6 +1715,42 @@ class GameEngine {
       arc.lifetime -= dt;
       if (arc.lifetime <= 0) {
         this.lightningArcs.splice(i, 1);
+      }
+    }
+
+    // 4c. Update Plasma Pools (Orbital Mortar)
+    for (let i = this.plasmaPools.length - 1; i >= 0; i--) {
+      const pool = this.plasmaPools[i];
+      pool.duration -= dt;
+      pool.tickTimer += dt;
+
+      // Boiling plasma particles
+      if (Math.random() < 0.45) {
+        const px = pool.x + (Math.random() - 0.5) * pool.radius * 2;
+        this.particles.push({
+          x: px,
+          y: pool.y - Math.random() * 8,
+          vx: (Math.random() - 0.5) * 20,
+          vy: -20 - Math.random() * 35,
+          color: Math.random() > 0.5 ? '#ff5400' : '#c77dff',
+          radius: 3 + Math.random() * 4,
+          life: 0.35,
+          maxLife: 0.35
+        });
+      }
+
+      if (pool.tickTimer >= 0.25) {
+        pool.tickTimer = 0;
+        const tickDmg = pool.dps * 0.25;
+        for (let enemy of this.enemies) {
+          if (Math.abs(enemy.x - pool.x) <= pool.radius + enemy.size / 2) {
+            this.damageEnemy(enemy, tickDmg, '#ff7b00');
+          }
+        }
+      }
+
+      if (pool.duration <= 0) {
+        this.plasmaPools.splice(i, 1);
       }
     }
 
@@ -1304,7 +1831,9 @@ class GameEngine {
         if (enemy.quakeTimer <= 0) {
           enemy.quakeTimer = enemy.quakeInterval;
           const quakeDmg = 15 + this.wave * 3;
-          this.towerHp -= quakeDmg;
+          if (!this.godMode) {
+            this.towerHp -= quakeDmg;
+          }
           // Screen shake particles
           for (let q = 0; q < 5; q++) {
             const qx = this.towerBaseX + Math.random() * this.crateWidth;
@@ -1324,7 +1853,9 @@ class GameEngine {
         if (enemy.fireBreathTimer <= 0) {
           enemy.fireBreathTimer = enemy.fireBreathInterval;
           const fireDmg = 50;
-          this.towerHp -= fireDmg;
+          if (!this.godMode) {
+            this.towerHp -= fireDmg;
+          }
           // Fire breath particle spray
           for (let f = 0; f < 20; f++) {
             const angle = Math.PI + (Math.random() - 0.5) * 0.8;
@@ -1343,6 +1874,53 @@ class GameEngine {
           window.soundManager.playFlame();
           if (this.towerHp <= 0) { this.towerHp = 0; this.triggerGameOver(); }
           this.updateHUD();
+        }
+      }
+
+      // === 1x1x1 SECRET BOSS: Glitch attacks and floating motion ===
+      if (enemy.type === 'boss_1x1x1' || enemy.type === '1x1x1') {
+        enemy.rot3d = (enemy.rot3d || 0) + 1.8 * dt;
+        enemy.floatOffset = Math.sin(performance.now() / 250) * 8;
+
+        // Glitch digital matrix spark particles
+        if (Math.random() < 0.6) {
+          const colors = ['#00f3ff', '#39ff14', '#ff007f', '#ffffff'];
+          const gc = colors[Math.floor(Math.random() * colors.length)];
+          this.particles.push({
+            x: enemy.x + (Math.random() - 0.5) * enemy.size,
+            y: enemy.y + (Math.random() - 0.5) * enemy.size,
+            vx: (Math.random() - 0.5) * 60,
+            vy: (Math.random() - 0.5) * 60,
+            color: gc,
+            radius: 2 + Math.random() * 3,
+            life: 0.3,
+            maxLife: 0.3
+          });
+        }
+
+        if (enemy.glitchAttackInterval > 0 && enemy.hp > 0) {
+          enemy.glitchAttackTimer -= dt;
+          if (enemy.glitchAttackTimer <= 0) {
+            enemy.glitchAttackTimer = enemy.glitchAttackInterval;
+            const glitchDmg = 50;
+            if (!this.godMode) {
+              this.towerHp -= glitchDmg;
+            }
+            this.cameraShake = 0.22;
+            for (let g = 0; g < 18; g++) {
+              const tx = this.towerBaseX + Math.random() * this.crateWidth;
+              const ty = this.groundY - Math.random() * (this.crateHeight * 5);
+              this.createExplosionParticles(tx, ty, '#00f3ff', 5);
+              this.createExplosionParticles(tx, ty, '#ff007f', 5);
+            }
+            this.addDamageText(this.towerBaseX + 35, this.groundY - 140, `GLITCH -${glitchDmg}`, '#00f3ff');
+            window.soundManager.playExplosion();
+            if (this.towerHp <= 0) {
+              this.towerHp = 0;
+              this.triggerGameOver();
+            }
+            this.updateHUD();
+          }
         }
       }
 
@@ -1372,12 +1950,16 @@ class GameEngine {
             dmg = dmg * (1 + (1 - hpRatio) * 1.0);
           }
 
-          this.towerHp -= dmg;
+          if (!this.godMode) {
+            this.towerHp -= dmg;
+          }
           window.soundManager.playHurt();
 
           // Poison crawler extra DoT
           if (enemy.poisonDps > 0) {
-            this.towerHp -= enemy.poisonDps;
+            if (!this.godMode) {
+              this.towerHp -= enemy.poisonDps;
+            }
             this.addDamageText(this.towerBaseX + this.crateWidth / 2 - 20, this.groundY - 200, `☠ -${enemy.poisonDps.toFixed(0)}`, '#70e000');
           }
 
@@ -1403,8 +1985,21 @@ class GameEngine {
       if (enemy.hp <= 0) {
         this.coins += enemy.coinReward;
         window.soundManager.playCoin();
-        this.createExplosionParticles(enemy.x, enemy.y, enemy.color, 15);
-        this.addDamageText(enemy.x, enemy.y - 15, `+${enemy.coinReward}🪙`, '#ffd166');
+
+        if (enemy.type === 'boss_1x1x1' || enemy.type === '1x1x1') {
+          // Extra massive celebratory fanfare for defeating 1x1x1 secret boss
+          this.createExplosionParticles(enemy.x, enemy.y, '#00f3ff', 40);
+          this.createExplosionParticles(enemy.x, enemy.y, '#ff007f', 40);
+          this.createExplosionParticles(enemy.x, enemy.y, '#ffd166', 40);
+          this.createExplosionParticles(enemy.x, enemy.y, '#39ff14', 40);
+          this.addDamageText(enemy.x, enemy.y - 45, '👑 1x1x1 DEFEATED!', '#00f3ff');
+          this.addDamageText(enemy.x, enemy.y - 20, '+1,000🪙 BOSS REWARD!', '#ffd166');
+          this.cameraShake = 0.35;
+        } else {
+          this.createExplosionParticles(enemy.x, enemy.y, enemy.color, 15);
+          this.addDamageText(enemy.x, enemy.y - 15, `+${enemy.coinReward}🪙`, '#ffd166');
+        }
+
         this.enemies.splice(i, 1);
         this.updateHUD();
         this.updateInspector();
@@ -1805,6 +2400,192 @@ class GameEngine {
         }
         break;
       }
+
+      // 14. COMBAT SHOTGUN: 5-pellet close/mid-range spread
+      case 'shotgun': {
+        slot.timer += dt;
+        if (target) {
+          slot.angle = this.getPredictiveAimAngle(muzzleX, muzzleY, target, stats.bulletSpeed);
+        }
+        if (slot.timer >= stats.interval) {
+          if (target) {
+            slot.timer = 0;
+            const baseAngle = this.getPredictiveAimAngle(muzzleX, muzzleY, target, stats.bulletSpeed);
+            for (let p = 0; p < stats.pellets; p++) {
+              const spread = (p - (stats.pellets - 1) / 2) * (stats.spreadAngle / (stats.pellets - 1 || 1)) + (Math.random() - 0.5) * 0.05;
+              const fireAngle = baseAngle + spread;
+              const spawnX = muzzleX + Math.cos(fireAngle) * 22;
+              const spawnY = muzzleY + Math.sin(fireAngle) * 22;
+              this.fireBullet(spawnX, spawnY, fireAngle, stats.damage, stats.bulletSpeed + (Math.random() - 0.5) * 80, '#ff9e00', 3.5);
+            }
+            this.createExplosionParticles(muzzleX + Math.cos(baseAngle) * 22, muzzleY + Math.sin(baseAngle) * 22, '#ff5400', 10);
+            window.soundManager.playShoot('shotgun');
+          }
+        }
+        break;
+      }
+
+      // 15. CRYO CANNON: Freezing frost canister that slows enemies by 65% in an AoE
+      case 'cryo_cannon': {
+        slot.timer += dt;
+        if (target) {
+          slot.angle = this.getPredictiveAimAngle(muzzleX, muzzleY, target, stats.bulletSpeed);
+        }
+        if (slot.timer >= stats.interval) {
+          if (target) {
+            slot.timer = 0;
+            const fireAngle = this.getPredictiveAimAngle(muzzleX, muzzleY, target, stats.bulletSpeed);
+            const spawnX = muzzleX + Math.cos(fireAngle) * 26;
+            const spawnY = muzzleY + Math.sin(fireAngle) * 26;
+            this.fireCryoCanister(spawnX, spawnY, fireAngle, stats.damage, stats.bulletSpeed, stats.blastRadius, stats.slowAmount, stats.slowDuration);
+            window.soundManager.playCryo();
+          }
+        }
+        break;
+      }
+
+      // 16. ORBITAL MORTAR: High-arc artillery targeting densest enemy cluster + lingering plasma pool
+      case 'orbital_mortar': {
+        slot.timer += dt;
+        slot.angle = -Math.PI / 4; // Angled upward
+        if (slot.timer >= stats.interval) {
+          let bestTarget = null;
+          let maxDensity = -1;
+          for (let e of this.enemies) {
+            if (e.hp <= 0) continue;
+            let count = 0;
+            for (let other of this.enemies) {
+              if (other.hp > 0 && Math.hypot(e.x - other.x, e.y - other.y) <= 120) count++;
+            }
+            if (count > maxDensity) {
+              maxDensity = count;
+              bestTarget = e;
+            }
+          }
+
+          if (bestTarget) {
+            slot.timer = 0;
+            this.fireMortarShell(muzzleX, muzzleY, bestTarget.x, this.groundY - 10, stats.damage, stats.blastRadius, stats.poolDuration, stats.poolDps);
+            window.soundManager.playMortarLaunch();
+          }
+        }
+        break;
+      }
+
+      // 17. TOXIC SPRAYER: Corrosive acid spray with Giant Slayer bonus against enemies > 1000 HP
+      case 'toxic_sprayer': {
+        slot.subTimer += dt;
+        // Spray neon acid particles
+        const sprayAngle = slot.angle + (Math.random() - 0.5) * stats.coneAngle;
+        this.particles.push({
+          x: muzzleX,
+          y: muzzleY,
+          vx: Math.cos(sprayAngle) * (160 + Math.random() * 80),
+          vy: Math.sin(sprayAngle) * (160 + Math.random() * 80),
+          color: Math.random() > 0.4 ? '#70e000' : '#38b000',
+          radius: 6 + Math.random() * 5,
+          life: 0.4,
+          maxLife: 0.4
+        });
+
+        if (slot.subTimer >= stats.tickInterval) {
+          slot.subTimer = 0;
+          window.soundManager.playAcid();
+          for (let enemy of this.enemies) {
+            const dx = enemy.x - muzzleX;
+            const dy = enemy.y - muzzleY;
+            const dist = Math.hypot(dx, dy);
+            if (dist <= stats.range) {
+              const angleToEnemy = Math.atan2(dy, dx);
+              let diff = Math.abs(angleToEnemy - slot.angle);
+              if (diff > Math.PI) diff = 2 * Math.PI - diff;
+              if (diff <= stats.coneAngle / 2) {
+                // Giant slayer perk: boost damage against enemies over 1000 health!
+                let dmg = stats.damage;
+                const isGiant = (enemy.maxHp >= stats.giantThreshold) || (enemy.hp >= stats.giantThreshold);
+                if (isGiant) {
+                  dmg *= stats.giantBonus;
+                  this.damageEnemy(enemy, dmg, '#70e000');
+                  if (Math.random() < 0.35) {
+                    this.addDamageText(enemy.x, enemy.y - 20, '☣CRIT', '#70e000');
+                  }
+                } else {
+                  this.damageEnemy(enemy, dmg, '#38b000');
+                }
+              }
+            }
+          }
+        }
+        break;
+      }
+
+      // 18. SOLAR CORE: Radiant miniature sun with heat aura + periodic solar flare nova
+      case 'solar_core': {
+        slot.timer += dt;
+        slot.subTimer += dt;
+        slot.angle = (slot.angle + 3.0 * dt) % (Math.PI * 2);
+        const mountX = coords.x + this.crateWidth / 2 + 15;
+        const mountY = Math.min(coords.y, this.groundY - 42);
+
+        // Radiant solar corona particles
+        if (Math.random() < 0.6) {
+          const a = Math.random() * Math.PI * 2;
+          const d = stats.auraRadius * (0.3 + Math.random() * 0.7);
+          this.particles.push({
+            x: mountX + Math.cos(a) * d,
+            y: mountY + Math.sin(a) * d,
+            vx: Math.cos(a) * (30 + Math.random() * 40),
+            vy: Math.sin(a) * (30 + Math.random() * 40),
+            color: Math.random() > 0.5 ? '#ffb703' : '#ffd166',
+            radius: 2 + Math.random() * 3,
+            life: 0.35,
+            maxLife: 0.35
+          });
+        }
+
+        // Passive heat aura damage
+        if (slot.subTimer >= stats.tickInterval) {
+          slot.subTimer = 0;
+          for (let enemy of this.enemies) {
+            const dist = Math.hypot(enemy.x - mountX, enemy.y - mountY);
+            if (dist <= stats.auraRadius + enemy.size / 2) {
+              this.damageEnemy(enemy, stats.damage, '#ffb703');
+            }
+          }
+        }
+
+        // Solar flare nova cycle
+        if (slot.timer >= stats.flareInterval) {
+          slot.timer = 0;
+          window.soundManager.playSolarFlare();
+          this.cameraShake = 0.16;
+
+          // Expanding golden nova ring
+          this.particles.push({
+            x: mountX,
+            y: mountY,
+            vx: 0,
+            vy: 0,
+            color: '#ffdd00',
+            radius: stats.flareRadius,
+            isRing: true,
+            life: 0.4,
+            maxLife: 0.4
+          });
+
+          // Solar flare damage + sunburst blind
+          for (let enemy of this.enemies) {
+            const dist = Math.hypot(enemy.x - mountX, enemy.y - mountY);
+            if (dist <= stats.flareRadius + enemy.size / 2) {
+              this.damageEnemy(enemy, stats.flareDamage, '#ffb703');
+              // Slow attack rate (blind)
+              enemy.attackCooldown = Math.max(enemy.attackCooldown, stats.blindDuration);
+              this.addDamageText(enemy.x, enemy.y - 25, '☀️ BLIND', '#ffd166');
+            }
+          }
+        }
+        break;
+      }
     }
   }
 
@@ -2004,6 +2785,45 @@ class GameEngine {
     }
   }
 
+  fireCryoCanister(x, y, angle, damage, speed, blastRadius, slowAmount, slowDuration) {
+    this.projectiles.push({
+      type: 'cryo',
+      x,
+      y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      damage,
+      blastRadius,
+      slowAmount,
+      slowDuration,
+      color: '#00f3ff',
+      radius: 7,
+      lifetime: 4.0
+    });
+  }
+
+  fireMortarShell(startX, startY, targetX, targetY, damage, blastRadius, poolDuration, poolDps) {
+    this.projectiles.push({
+      type: 'mortar',
+      x: startX,
+      y: startY,
+      startX,
+      startY,
+      targetX,
+      targetY,
+      damage,
+      blastRadius,
+      poolDuration,
+      poolDps,
+      arcTime: 0,
+      maxArcTime: 1.1,
+      arcHeight: 180,
+      radius: 6,
+      color: '#ff5400',
+      lifetime: 3.0
+    });
+  }
+
   pointToSegmentDistance(px, py, x1, y1, x2, y2) {
     const l2 = (x2 - x1) * (x2 - x1) + (y2 - y1) * (y2 - y1);
     if (l2 === 0) return Math.hypot(px - x1, py - y1);
@@ -2013,7 +2833,21 @@ class GameEngine {
   }
 
   onProjectileHit(p, targetEnemy) {
-    if (p.type === 'rpg') {
+    if (p.type === 'cryo') {
+      window.soundManager.playCryo();
+      this.createExplosionParticles(p.x, p.y, '#00f3ff', 24);
+      this.createExplosionParticles(p.x, p.y, '#ffffff', 14);
+
+      for (let enemy of this.enemies) {
+        const d = Math.hypot(enemy.x - p.x, enemy.y - p.y);
+        if (d <= p.blastRadius + enemy.size / 2) {
+          this.damageEnemy(enemy, p.damage, '#00f3ff');
+          enemy.slowTimer = p.slowDuration;
+          enemy.slowMult = 1 - p.slowAmount;
+          this.addDamageText(enemy.x, enemy.y - 25, '❄ FREEZE', '#00f3ff');
+        }
+      }
+    } else if (p.type === 'rpg') {
       // Explode and distribute total 250 damage equally among all hit targets
       window.soundManager.playExplosion();
       this.createExplosionParticles(p.x, p.y, '#ff5400', 35);
@@ -2104,6 +2938,7 @@ class GameEngine {
     this.damageNumbers = [];
     this.beams = [];
     this.lightningArcs = [];
+    this.plasmaPools = [];
     this.cameraShake = 0;
 
     this.slots.forEach(s => {
@@ -2135,6 +2970,9 @@ class GameEngine {
 
     // 1. Cyber Sci-fi Grid Background
     this.drawBackground();
+
+    // 1b. Draw Lingering Plasma Pools (Orbital Mortar)
+    this.drawPlasmaPools();
 
     // 2. Draw Beams & Lightning
     this.drawRailgunBeams();
@@ -2194,6 +3032,28 @@ class GameEngine {
     this.ctx.moveTo(0, this.groundY);
     this.ctx.lineTo(w, this.groundY);
     this.ctx.stroke();
+  }
+
+  drawPlasmaPools() {
+    for (let pool of this.plasmaPools) {
+      const alpha = Math.min(1.0, pool.duration / 0.5);
+      this.ctx.save();
+      this.ctx.shadowColor = '#ff5400';
+      this.ctx.shadowBlur = 20;
+
+      // Outer plasma glow on ground
+      const grad = this.ctx.createRadialGradient(pool.x, pool.y, 4, pool.x, pool.y, pool.radius);
+      grad.addColorStop(0, `rgba(255, 230, 0, ${0.85 * alpha})`);
+      grad.addColorStop(0.35, `rgba(255, 84, 0, ${0.75 * alpha})`);
+      grad.addColorStop(0.7, `rgba(180, 0, 255, ${0.5 * alpha})`);
+      grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      this.ctx.fillStyle = grad;
+      this.ctx.beginPath();
+      this.ctx.ellipse(pool.x, pool.y, pool.radius, pool.radius * 0.35, 0, 0, Math.PI * 2);
+      this.ctx.fill();
+
+      this.ctx.restore();
+    }
   }
 
   drawTowerAndCharacter() {
@@ -2262,7 +3122,7 @@ class GameEngine {
 
     // Close range spinning weapons are mounted on an extended front mechanical arm (x + 35)
     // so they spin completely free in open air and never hit or overlap the crate body!
-    if (slot.weapon === 'chainsaw' || slot.weapon === 'energy_blade' || slot.weapon === 'void_rift' || slot.weapon === 'graviton_hammer') {
+    if (slot.weapon === 'chainsaw' || slot.weapon === 'energy_blade' || slot.weapon === 'void_rift' || slot.weapon === 'graviton_hammer' || slot.weapon === 'solar_core') {
       const mountX = x + this.crateWidth / 2 + 15;
       // Ensure the weapon center is elevated high enough above groundY
       const radius = stats.spinRadius || 36;
@@ -2429,6 +3289,43 @@ class GameEngine {
       return;
     }
 
+    if (slot.weapon === 'solar_core') {
+      this.ctx.rotate(slot.angle);
+
+      // Blazing solar corona aura
+      this.ctx.shadowColor = '#ffd166';
+      this.ctx.shadowBlur = 24;
+
+      // Outer golden solar corona gradient
+      const sunGrad = this.ctx.createRadialGradient(0, 0, 4, 0, 0, 24);
+      sunGrad.addColorStop(0, '#ffffff');
+      sunGrad.addColorStop(0.3, '#fff3b0');
+      sunGrad.addColorStop(0.65, '#ffb703');
+      sunGrad.addColorStop(1, 'rgba(251, 133, 0, 0)');
+      this.ctx.fillStyle = sunGrad;
+      this.ctx.beginPath();
+      this.ctx.arc(0, 0, 24, 0, Math.PI * 2);
+      this.ctx.fill();
+
+      // Pulsing solar prominences
+      this.ctx.fillStyle = 'rgba(255, 183, 3, 0.7)';
+      for (let p = 0; p < 6; p++) {
+        const pAng = (Math.PI * 2 * p) / 6 + slot.angle * 0.5;
+        this.ctx.beginPath();
+        this.ctx.arc(Math.cos(pAng) * 14, Math.sin(pAng) * 14, 4, 0, Math.PI * 2);
+        this.ctx.fill();
+      }
+
+      // Bright white-hot core
+      this.ctx.fillStyle = '#ffffff';
+      this.ctx.beginPath();
+      this.ctx.arc(0, 0, 9, 0, Math.PI * 2);
+      this.ctx.fill();
+
+      this.ctx.restore();
+      return;
+    }
+
     // Aimed Weapons & Guns
     this.ctx.rotate(slot.angle);
 
@@ -2538,6 +3435,69 @@ class GameEngine {
       this.ctx.beginPath();
       this.ctx.arc(24, 0, 5, 0, Math.PI * 2);
       this.ctx.fill();
+    } else if (slot.weapon === 'shotgun') {
+      // Tactical Combat Shotgun: Heavy dual/pump matte barrels, vented heat-shield & walnut stock
+      this.ctx.fillStyle = '#1f2421';
+      this.ctx.fillRect(0, -5, 22, 10);
+      // Dual matte steel barrels
+      this.ctx.fillStyle = '#495057';
+      this.ctx.fillRect(18, -4, 10, 3.5);
+      this.ctx.fillRect(18, 0.5, 10, 3.5);
+      // Textured pump fore-end
+      this.ctx.fillStyle = '#9c6644';
+      this.ctx.fillRect(8, -6, 8, 3);
+      // Heavy stock
+      this.ctx.fillStyle = '#212529';
+      this.ctx.fillRect(-8, -3, 9, 6);
+    } else if (slot.weapon === 'cryo_cannon') {
+      // Cryo Cannon: Frost-chassis heavy projector with glowing liquid nitrogen tank & icy emitter
+      this.ctx.shadowColor = '#00f5d4';
+      this.ctx.shadowBlur = 10;
+      this.ctx.fillStyle = '#0b525b';
+      this.ctx.fillRect(0, -6, 26, 12);
+      // Cryo emitter muzzle
+      this.ctx.fillStyle = '#48cae4';
+      this.ctx.fillRect(24, -7, 6, 14);
+      // Liquid nitrogen cylindrical vial
+      this.ctx.fillStyle = '#90e0ef';
+      this.ctx.fillRect(4, -3, 14, 6);
+      this.ctx.fillStyle = '#ffffff';
+      this.ctx.fillRect(8, -1.5, 6, 3);
+    } else if (slot.weapon === 'orbital_mortar') {
+      // Orbital Mortar: Heavy angled artillery cannon with reinforcing hydraulic rings & glowing plasma breech
+      this.ctx.fillStyle = '#370617';
+      this.ctx.fillRect(-6, -7, 30, 14);
+      this.ctx.fillStyle = '#6a040f';
+      this.ctx.fillRect(20, -8, 8, 16);
+      // Heavy reinforcing rings
+      this.ctx.fillStyle = '#d00000';
+      this.ctx.fillRect(2, -8, 4, 16);
+      this.ctx.fillRect(12, -8, 4, 16);
+      // Glowing plasma breech
+      this.ctx.shadowColor = '#ffba08';
+      this.ctx.shadowBlur = 8;
+      this.ctx.fillStyle = '#faa307';
+      this.ctx.beginPath();
+      this.ctx.arc(-2, 0, 4, 0, Math.PI * 2);
+      this.ctx.fill();
+    } else if (slot.weapon === 'toxic_sprayer') {
+      // Toxic Sprayer: Industrial Hazmat chemical canister & high-pressure sprayer nozzle
+      this.ctx.fillStyle = '#2d6a4f';
+      this.ctx.fillRect(0, -6, 22, 12);
+      // Pressurized neon green toxic reservoir
+      this.ctx.shadowColor = '#70e000';
+      this.ctx.shadowBlur = 8;
+      this.ctx.fillStyle = '#70e000';
+      this.ctx.fillRect(4, -3, 10, 6);
+      // High-pressure cone nozzle
+      this.ctx.fillStyle = '#52b788';
+      this.ctx.beginPath();
+      this.ctx.moveTo(22, -6);
+      this.ctx.lineTo(28, -2);
+      this.ctx.lineTo(28, 2);
+      this.ctx.lineTo(22, 6);
+      this.ctx.closePath();
+      this.ctx.fill();
     }
 
     this.ctx.restore();
@@ -2625,6 +3585,59 @@ class GameEngine {
         this.ctx.arc(0, 0, p.radius * 0.25, 0, Math.PI * 2);
         this.ctx.fill();
 
+        this.ctx.restore();
+        continue;
+      }
+
+      if (p.type === 'cryo') {
+        this.ctx.save();
+        this.ctx.shadowColor = '#00f5d4';
+        this.ctx.shadowBlur = 14;
+        // Outer frozen frost mist gradient
+        const frostGrad = this.ctx.createRadialGradient(p.x, p.y, 2, p.x, p.y, p.radius + 5);
+        frostGrad.addColorStop(0, '#ffffff');
+        frostGrad.addColorStop(0.4, '#90e0ef');
+        frostGrad.addColorStop(0.8, '#00b4d8');
+        frostGrad.addColorStop(1, 'rgba(0, 119, 182, 0)');
+        this.ctx.fillStyle = frostGrad;
+        this.ctx.beginPath();
+        this.ctx.arc(p.x, p.y, p.radius + 5, 0, Math.PI * 2);
+        this.ctx.fill();
+        // Solid crystalline ice core
+        this.ctx.fillStyle = '#caf0f8';
+        this.ctx.beginPath();
+        this.ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+        this.ctx.fill();
+        this.ctx.restore();
+        continue;
+      }
+
+      if (p.type === 'mortar') {
+        this.ctx.save();
+        this.ctx.translate(p.x, p.y);
+        const flightAngle = Math.atan2(p.vy, p.vx);
+        this.ctx.rotate(flightAngle);
+        // Heavy aerodynamic artillery shell
+        this.ctx.shadowColor = '#ff6b35';
+        this.ctx.shadowBlur = 10;
+        this.ctx.fillStyle = '#370617';
+        this.ctx.fillRect(-8, -4, 12, 8);
+        // Ballistic shell nosecone
+        this.ctx.fillStyle = '#e63946';
+        this.ctx.beginPath();
+        this.ctx.moveTo(4, -4);
+        this.ctx.lineTo(12, 0);
+        this.ctx.lineTo(4, 4);
+        this.ctx.closePath();
+        this.ctx.fill();
+        // Thruster exhaust flame
+        this.ctx.fillStyle = '#ffd166';
+        this.ctx.beginPath();
+        this.ctx.moveTo(-8, -3);
+        this.ctx.lineTo(-14, 0);
+        this.ctx.lineTo(-8, 3);
+        this.ctx.closePath();
+        this.ctx.fill();
         this.ctx.restore();
         continue;
       }
@@ -2945,6 +3958,55 @@ class GameEngine {
         this.ctx.beginPath();
         this.ctx.arc(-r * 0.1, r * 0.2, r * 0.25, 0, Math.PI);
         this.ctx.fill();
+      } else if (e.type === 'boss_1x1x1' || e.type === '1x1x1') {
+        // Mysterious 1x1x1 Glitch Hypercube Boss
+        const fY = e.floatOffset || 0;
+        this.ctx.translate(0, fY);
+
+        // Chromatic aberration glitch outlines
+        const glitchShift = Math.sin(performance.now() / 90) * 3.5;
+        this.ctx.strokeStyle = '#00f3ff';
+        this.ctx.lineWidth = 2;
+        this.ctx.strokeRect(-r + glitchShift, -r, e.size, e.size);
+
+        this.ctx.strokeStyle = '#ff007f';
+        this.ctx.lineWidth = 2;
+        this.ctx.strokeRect(-r - glitchShift, -r, e.size, e.size);
+
+        // Pitch black void inner cube
+        this.ctx.fillStyle = '#06060c';
+        this.ctx.fillRect(-r, -r, e.size, e.size);
+
+        // Cyber cyan border
+        this.ctx.strokeStyle = '#00f3ff';
+        this.ctx.lineWidth = 3;
+        this.ctx.strokeRect(-r, -r, e.size, e.size);
+
+        // Rotating nested wireframe
+        this.ctx.save();
+        this.ctx.rotate(e.rot3d || 0);
+        this.ctx.strokeStyle = '#39ff14';
+        this.ctx.lineWidth = 1.5;
+        this.ctx.strokeRect(-r * 0.55, -r * 0.55, e.size * 0.55, e.size * 0.55);
+        this.ctx.restore();
+
+        // Sinister center core eye
+        this.ctx.fillStyle = '#ff0054';
+        this.ctx.shadowColor = '#ff0054';
+        this.ctx.shadowBlur = 14;
+        this.ctx.beginPath();
+        this.ctx.arc(0, 0, 8, 0, Math.PI * 2);
+        this.ctx.fill();
+        this.ctx.fillStyle = '#ffffff';
+        this.ctx.beginPath();
+        this.ctx.arc(0, 0, 3.5, 0, Math.PI * 2);
+        this.ctx.fill();
+
+        // Glitch 1x1x1 tag inside cube
+        this.ctx.fillStyle = '#00f3ff';
+        this.ctx.font = 'bold 9px "Chakra Petch", monospace';
+        this.ctx.textAlign = 'center';
+        this.ctx.fillText('[ 1x1x1 ]', 0, r * 0.65);
       } else {
         // Default Scout crawler
         this.ctx.beginPath();
@@ -2956,7 +4018,7 @@ class GameEngine {
       this.ctx.globalAlpha = renderAlpha;
 
       // Glowing evil eye (skip for types that have custom eyes)
-      if (!['swarm_drone', 'phantom_overlord', 'inferno_wyrm', 'necromancer'].includes(e.type)) {
+      if (!['swarm_drone', 'phantom_overlord', 'inferno_wyrm', 'necromancer', 'boss_1x1x1', '1x1x1'].includes(e.type)) {
         this.ctx.fillStyle = '#fff';
         this.ctx.beginPath();
         this.ctx.arc(-r * 0.3, -r * 0.2, r * 0.25, 0, Math.PI * 2);

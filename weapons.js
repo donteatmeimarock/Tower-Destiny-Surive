@@ -5,18 +5,23 @@
 //  2. "AK-47": 3 dmg every 0.5s. 5 upgrades.
 //  3. "Minigun": 0.4 dmg every 0.02s. 5 upgrades.
 //  4. "Sniper Rifle": 18 dmg every 3.5s. 5 upgrades. High-velocity precision rifle.
+//  5. "Combat Shotgun": 5 pellets x 2.2 dmg every 1.1s. 5 upgrades. Wide close-range cone spread.
 // GODLY GUNS:
-//  5. "Energy Railgun": Charge 10s, shoots blue ray piercing 75 dmg. 5 upgrades.
-//  6. "RPG": 5s wait, shoots exploding grenade dealing 250 dmg total split across all enemies hit. 5 upgrades.
-//  7. "Tesla Coil": 35 dmg every 4.0s, chain lightning bouncing between up to 5 enemies! 5 upgrades.
+//  6. "Energy Railgun": Charge 10s, shoots blue ray piercing 75 dmg. 5 upgrades.
+//  7. "RPG": 5s wait, shoots exploding grenade dealing 250 dmg total split across all enemies hit. 5 upgrades.
+//  8. "Tesla Coil": 35 dmg every 4.0s, chain lightning bouncing between up to 5 enemies! 5 upgrades.
+//  9. "Cryo Cannon": 40 dmg every 2.8s in 90px AoE, slowing enemies by 65%. 5 upgrades.
+//  10. "Orbital Mortar": 160 impact dmg every 6.0s + leaves 3.5s boiling plasma pool dealing 42 DPS. 5 upgrades.
 // CLOSE RANGE WEAPONS:
-//  8. "Flamethrower": every 7s, blow fire dealing 1 dmg every 0.25s for duration. 3 upgrades.
-//  9. "Chainsaw": spins forever, deals 0.3 dmg every 0.1s. 3 upgrades.
-//  10. "Buzz Saw": launches returning boomerang saw dealing 6 dmg both ways. 3 upgrades.
+//  11. "Flamethrower": every 7s, blow fire dealing 1 dmg every 0.25s for duration. 3 upgrades.
+//  12. "Chainsaw": spins forever, deals 0.3 dmg every 0.1s. 3 upgrades.
+//  13. "Buzz Saw": launches returning boomerang saw dealing 6 dmg both ways. 3 upgrades.
+//  14. "Toxic Sprayer": corrosive acid dealing 2.5 dmg/0.2s with 2.5x-3.5x bonus against enemies over 1000 HP! 3 upgrades.
 // GODLY CLOSE RANGE WEAPONS:
-//  11. "Energy Blade": spins forever, deals 2 dmg every 0.1s. 3 upgrades.
-//  12. "Graviton Hammer": 25 AoE slam every 5.0s, slows enemies by 50%. 3 upgrades.
-//  13. "Void Rift": persistent gravitational vortex dealing 1.8 dmg/0.12s and pulling enemies. 3 upgrades.
+//  15. "Energy Blade": spins forever, deals 2 dmg every 0.1s. 3 upgrades.
+//  16. "Graviton Hammer": 25 AoE slam every 5.0s, slows enemies by 50%. 3 upgrades.
+//  17. "Void Rift": persistent gravitational vortex dealing 1.8 dmg/0.12s and pulling enemies. 3 upgrades.
+//  18. "Solar Core": radiant miniature sun with 4 dmg/0.15s heat aura + periodic 90 dmg solar flare nova. 3 upgrades.
 
 const WEAPON_REGISTRY = {
   turret: {
@@ -324,6 +329,134 @@ const WEAPON_REGISTRY = {
       { damage: 3.5, tickInterval: 0.11, vortexRadius: 115, pullStrength: 35 },
       { damage: 6.0, tickInterval: 0.10, vortexRadius: 130, pullStrength: 50 },
       { damage: 10.0, tickInterval: 0.09, vortexRadius: 150, pullStrength: 70 }
+    ]
+  },
+
+  shotgun: {
+    id: 'shotgun',
+    name: 'Combat Shotgun',
+    category: 'gun',
+    icon: '💥',
+    basePrice: 45,
+    maxUpgrades: 5,
+    description: 'Pump-action shotgun. Fires a wide 5-pellet spread shredding close enemies.',
+    baseStats: {
+      damage: 2.2,
+      pellets: 5,
+      interval: 1.1,
+      spreadAngle: 0.42,
+      range: 600,
+      bulletSpeed: 950
+    },
+    upgradeCosts: [35, 65, 110, 170, 250],
+    statUpgrades: [
+      { damage: 3.2, pellets: 5, interval: 1.0 },
+      { damage: 4.5, pellets: 6, interval: 0.9 },
+      { damage: 6.5, pellets: 6, interval: 0.8 },
+      { damage: 9.0, pellets: 7, interval: 0.7 },
+      { damage: 13.0, pellets: 7, interval: 0.6 }
+    ]
+  },
+
+  cryo_cannon: {
+    id: 'cryo_cannon',
+    name: 'Cryo Cannon',
+    category: 'godly-gun',
+    icon: '❄️',
+    basePrice: 220,
+    maxUpgrades: 5,
+    description: 'Fires sub-zero canisters that detonate into freezing frost, slowing enemies by 65%!',
+    baseStats: {
+      damage: 40,
+      interval: 2.8,
+      range: 1200,
+      bulletSpeed: 620,
+      blastRadius: 90,
+      slowAmount: 0.65,
+      slowDuration: 2.5
+    },
+    upgradeCosts: [120, 210, 340, 500, 720],
+    statUpgrades: [
+      { damage: 65, interval: 2.5, blastRadius: 105, slowDuration: 2.8, slowAmount: 0.65 },
+      { damage: 100, interval: 2.2, blastRadius: 120, slowDuration: 3.2, slowAmount: 0.70 },
+      { damage: 150, interval: 1.9, blastRadius: 135, slowDuration: 3.6, slowAmount: 0.70 },
+      { damage: 220, interval: 1.7, blastRadius: 150, slowDuration: 4.0, slowAmount: 0.75 },
+      { damage: 310, interval: 1.5, blastRadius: 170, slowDuration: 4.5, slowAmount: 0.75 }
+    ]
+  },
+
+  orbital_mortar: {
+    id: 'orbital_mortar',
+    name: 'Orbital Mortar',
+    category: 'godly-gun',
+    icon: '☄️',
+    basePrice: 280,
+    maxUpgrades: 5,
+    description: 'Lobs high-arc explosive shells onto enemy packs, leaving a boiling pool of plasma.',
+    baseStats: {
+      damage: 160,
+      interval: 6.0,
+      range: 1200,
+      blastRadius: 120,
+      poolDuration: 3.5,
+      poolDps: 42
+    },
+    upgradeCosts: [150, 270, 420, 620, 880],
+    statUpgrades: [
+      { damage: 250, interval: 5.5, blastRadius: 135, poolDuration: 3.8, poolDps: 65 },
+      { damage: 380, interval: 5.0, blastRadius: 150, poolDuration: 4.0, poolDps: 100 },
+      { damage: 560, interval: 4.5, blastRadius: 165, poolDuration: 4.2, poolDps: 150 },
+      { damage: 800, interval: 4.0, blastRadius: 185, poolDuration: 4.5, poolDps: 220 },
+      { damage: 1150, interval: 3.5, blastRadius: 210, poolDuration: 5.0, poolDps: 320 }
+    ]
+  },
+
+  toxic_sprayer: {
+    id: 'toxic_sprayer',
+    name: 'Toxic Sprayer',
+    category: 'melee',
+    icon: '🧪',
+    basePrice: 60,
+    maxUpgrades: 3,
+    description: 'Sprays corrosive acid fumes. Deals massive bonus damage to enemies over 1000 HP!',
+    baseStats: {
+      damage: 2.5,
+      tickInterval: 0.20,
+      range: 170,
+      coneAngle: Math.PI / 3.2,
+      giantBonus: 2.5,
+      giantThreshold: 1000
+    },
+    upgradeCosts: [55, 110, 190],
+    statUpgrades: [
+      { damage: 4.5, tickInterval: 0.18, range: 190, giantBonus: 2.8 },
+      { damage: 8.0, tickInterval: 0.16, range: 210, giantBonus: 3.2 },
+      { damage: 14.0, tickInterval: 0.14, range: 240, giantBonus: 3.5 }
+    ]
+  },
+
+  solar_core: {
+    id: 'solar_core',
+    name: 'Solar Core',
+    category: 'godly-melee',
+    icon: '☀️',
+    basePrice: 320,
+    maxUpgrades: 3,
+    description: 'Miniature sun hovering before the tower. Searing heat aura + periodic solar novas!',
+    baseStats: {
+      damage: 4.0,
+      tickInterval: 0.15,
+      auraRadius: 90,
+      flareDamage: 90,
+      flareInterval: 3.0,
+      flareRadius: 150,
+      blindDuration: 2.0
+    },
+    upgradeCosts: [180, 340, 540],
+    statUpgrades: [
+      { damage: 7.5, tickInterval: 0.14, auraRadius: 100, flareDamage: 160, flareInterval: 2.6, flareRadius: 175 },
+      { damage: 13.0, tickInterval: 0.13, auraRadius: 110, flareDamage: 270, flareInterval: 2.3, flareRadius: 200 },
+      { damage: 22.0, tickInterval: 0.12, auraRadius: 125, flareDamage: 440, flareInterval: 2.0, flareRadius: 230 }
     ]
   }
 };

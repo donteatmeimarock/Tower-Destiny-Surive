@@ -46,6 +46,7 @@
       </div>
 
       <div class="controls-zone">
+        <button id="admin-btn" class="hud-btn admin-btn" title="Open Admin Panel">⚡ ADMIN</button>
         <button id="speed-btn" class="hud-btn" title="Toggle Speed">1x ⏩</button>
         <button id="pause-btn" class="hud-btn" title="Pause Game">⏸️</button>
         <button id="sound-btn" class="hud-btn" title="Sound Mute/Unmute">🔊</button>
@@ -127,6 +128,133 @@
       <span class="hint-text">💡 Tip: Equip weapons like Sniper Rifle, Tesla Coil, Buzz Saw, Graviton Hammer, or Void Rift to dominate every wave!</span>
       <span class="credits">Tower Destiny Survive &bull; Antigravity Edition</span>
     </footer>
+
+    <!-- Admin Authentication Password Modal -->
+    <div id="admin-auth-modal" class="modal-backdrop hidden">
+      <div class="admin-auth-card">
+        <div class="auth-header">
+          <div class="auth-title-wrap">
+            <span class="auth-icon">🔒</span>
+            <h3>ADMIN VERIFICATION</h3>
+          </div>
+          <button id="admin-auth-close-btn" class="modal-close-btn" title="Close">&times;</button>
+        </div>
+        <p class="auth-desc">Enter the authorization password to unlock developer controls:</p>
+        <div class="auth-input-group">
+          <input type="password" id="admin-pass-input" placeholder="Password..." autocomplete="off" />
+          <button id="admin-submit-pass-btn" class="glow-button">UNLOCK</button>
+        </div>
+        <div id="admin-auth-error" class="auth-error-msg hidden">⚠️ Invalid password! Access denied.</div>
+      </div>
+    </div>
+
+    <!-- Full Developer Admin Panel Modal -->
+    <div id="admin-panel-modal" class="modal-backdrop hidden">
+      <div class="admin-panel-card">
+        <div class="admin-header">
+          <div class="admin-title-row">
+            <span class="admin-logo-icon">⚡</span>
+            <div>
+              <h3>DEVELOPER ADMIN PANEL</h3>
+              <span class="admin-badge">ROOT ACCESS GRANTED</span>
+            </div>
+          </div>
+          <button id="admin-panel-close-btn" class="modal-close-btn" title="Close Panel">&times;</button>
+        </div>
+
+        <div class="admin-body">
+          <!-- Column 1: Money & Cheats -->
+          <div class="admin-section">
+            <h4 class="section-title">🪙 MONEY & CHEATS</h4>
+            <div class="admin-grid-buttons">
+              <button class="admin-action-btn coin-add-btn" data-coins="1000">+1,000 🪙</button>
+              <button class="admin-action-btn coin-add-btn" data-coins="5000">+5,000 🪙</button>
+              <button class="admin-action-btn coin-add-btn" data-coins="25000">+25,000 🪙</button>
+              <button class="admin-action-btn coin-add-btn" data-coins="100000">+100,000 🪙</button>
+            </div>
+            <div class="admin-input-row">
+              <input type="number" id="custom-coins-input" placeholder="Amount..." min="1" value="10000" />
+              <button id="give-custom-coins-btn" class="admin-secondary-btn">Add Coins</button>
+            </div>
+            <div class="admin-divider"></div>
+            <div class="admin-grid-buttons">
+              <button id="admin-max-hp-btn" class="admin-action-btn green-btn">❤️ Heal Tower (Max HP)</button>
+              <button id="admin-god-mode-btn" class="admin-action-btn purple-btn">🛡️ God Mode: OFF</button>
+            </div>
+          </div>
+
+          <!-- Column 2: Crate Weapon Placer & Upgrades -->
+          <div class="admin-section admin-weapon-section">
+            <h4 class="section-title">📦 CRATE WEAPON PLACER & UPGRADES</h4>
+            <p class="section-sub">Equip ANY weapon directly into ANY crate without buying!</p>
+            
+            <div class="slot-select-row">
+              <span class="sub-label">Target Crate:</span>
+              <div class="slot-radio-group" id="admin-slot-selector">
+                <button class="admin-slot-chip active" data-slot="0">Crate 1</button>
+                <button class="admin-slot-chip" data-slot="1">Crate 2</button>
+                <button class="admin-slot-chip" data-slot="2">Crate 3</button>
+                <button class="admin-slot-chip" data-slot="3">Crate 4</button>
+                <button class="admin-slot-chip" data-slot="4">Crate 5</button>
+              </div>
+            </div>
+
+            <div class="admin-current-slot-info" id="admin-slot-status">
+              Target: <strong id="admin-target-slot-name">Crate 1</strong> &bull; Equipped: <span id="admin-target-slot-wep" class="highlight-cyan">Empty</span>
+            </div>
+
+            <div class="admin-input-row">
+              <select id="admin-weapon-select" class="admin-select">
+                <!-- Dynamically populated with all 18 weapons grouped by category -->
+              </select>
+              <button id="admin-force-equip-btn" class="admin-primary-btn">⚡ Force Equip</button>
+              <button id="admin-clear-slot-btn" class="admin-danger-btn">🗑️ Clear</button>
+            </div>
+
+            <div class="admin-upgrades-sub">
+              <span class="sub-label">Set Upgrade Level:</span>
+              <div class="admin-level-buttons" id="admin-level-buttons">
+                <button class="level-chip active" data-lvl="0">0 (Base)</button>
+                <button class="level-chip" data-lvl="1">★ 1</button>
+                <button class="level-chip" data-lvl="2">★★ 2</button>
+                <button class="level-chip" data-lvl="3">★★★ 3</button>
+                <button class="level-chip" data-lvl="4">★★★★ 4</button>
+                <button class="level-chip" data-lvl="5">★★★★★ 5</button>
+              </div>
+              <div class="admin-grid-buttons mt-8">
+                <button id="admin-max-current-wep-btn" class="admin-action-btn gold-btn">⭐ Max Target Weapon</button>
+                <button id="admin-max-all-weps-btn" class="admin-action-btn godly-gradient-btn">🌟 Max All 5 Crates!</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Column 3: Secret 1x1x1 Boss & Wave Controls -->
+          <div class="admin-section">
+            <h4 class="section-title">👾 SECRET BOSS & BATTLE</h4>
+            
+            <!-- Special 1x1x1 Secret Boss Spawn Button -->
+            <button id="admin-spawn-1x1x1-btn" class="admin-boss-spawn-btn">
+              <span class="boss-btn-icon">⬛</span>
+              <div class="boss-btn-info">
+                <span class="boss-btn-title">SPAWN 1x1x1 SECRET BOSS</span>
+                <span class="boss-btn-subtitle">Defeat Reward: +1,000 🪙 Coins</span>
+              </div>
+              <span class="boss-btn-badge">SECRET</span>
+            </button>
+
+            <div class="admin-grid-buttons mt-12">
+              <button id="admin-kill-all-btn" class="admin-action-btn red-btn">💀 Kill All Enemies</button>
+              <button id="admin-next-wave-btn" class="admin-action-btn cyan-btn">🌊 Force Next Wave</button>
+            </div>
+
+            <div class="admin-input-row mt-12">
+              <input type="number" id="admin-wave-jump-input" placeholder="Jump to wave..." min="1" value="5" />
+              <button id="admin-wave-jump-btn" class="admin-secondary-btn">Jump Wave</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 
   <script src="audio.js"></script>

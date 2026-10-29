@@ -696,8 +696,37 @@ body {
 }
 
 /* =========================================
-   ADMIN PANEL & AUTHENTICATION STYLES
+   AUTO WAVE & ADMIN PANEL STYLES
    ========================================= */
+
+.auto-wave-btn {
+  background: rgba(22, 33, 62, 0.85);
+  border: 1px solid rgba(0, 255, 136, 0.3);
+  color: #a8dadc;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  transition: all 0.2s ease;
+}
+
+.auto-wave-btn:hover {
+  background: rgba(0, 255, 136, 0.15);
+  border-color: #00ff88;
+  color: #fff;
+}
+
+.auto-wave-btn.active {
+  background: linear-gradient(135deg, rgba(0, 255, 136, 0.25), rgba(0, 243, 255, 0.35)) !important;
+  border: 1px solid #00ff88 !important;
+  color: #00ff88 !important;
+  font-weight: 800 !important;
+  box-shadow: 0 0 14px rgba(0, 255, 136, 0.45);
+  animation: autoWavePulse 2s infinite alternate;
+}
+
+@keyframes autoWavePulse {
+  0% { box-shadow: 0 0 8px rgba(0, 255, 136, 0.3); }
+  100% { box-shadow: 0 0 16px rgba(0, 255, 136, 0.7); }
+}
 
 .admin-btn {
   background: linear-gradient(135deg, #7928ca, #ff007f) !important;
@@ -1185,6 +1214,128 @@ body {
   border-color: #ffb703;
   color: #ffb703;
 }
+
+/* Secret Upgrade UI Elements */
+.secret-upgrades-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.secret-tag {
+  font-family: 'Chakra Petch', sans-serif;
+  font-size: 9px;
+  font-weight: 800;
+  color: #ff007f;
+  background: rgba(255, 0, 127, 0.15);
+  border: 1px solid rgba(255, 0, 127, 0.4);
+  padding: 1px 6px;
+  border-radius: 4px;
+  letter-spacing: 1px;
+}
+
+.admin-secret-chips {
+  display: flex;
+  gap: 4px;
+}
+
+.secret-chip {
+  flex: 1;
+  background: rgba(121, 40, 202, 0.18);
+  border: 1px solid rgba(157, 78, 221, 0.4);
+  border-radius: 4px;
+  padding: 4px 1px;
+  font-family: 'Chakra Petch', sans-serif;
+  font-size: 9px;
+  font-weight: 700;
+  color: #c77dff;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.secret-chip:hover {
+  background: rgba(121, 40, 202, 0.4);
+  border-color: #00f3ff;
+  color: #fff;
+  transform: translateY(-1px);
+}
+
+.secret-chip.active {
+  background: linear-gradient(135deg, #7928ca, #ff007f) !important;
+  border-color: #00f3ff !important;
+  color: #fff !important;
+  box-shadow: 0 0 10px rgba(0, 243, 255, 0.5);
+}
+
+.secret-chip.max-secret {
+  background: linear-gradient(135deg, rgba(255, 0, 127, 0.25), rgba(255, 183, 3, 0.25));
+  border-color: #ff007f;
+  color: #ffd166;
+}
+
+.admin-custom-level-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(0, 0, 0, 0.25);
+  padding: 5px 8px;
+  border-radius: 6px;
+  border: 1px dashed rgba(157, 78, 221, 0.4);
+}
+
+.secret-input-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: #c77dff;
+  white-space: nowrap;
+}
+
+.admin-custom-level-row input {
+  width: 60px;
+  background: #090c16;
+  border: 1px solid #2a3b66;
+  border-radius: 4px;
+  padding: 4px 6px;
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 13px;
+  color: #00f3ff;
+  font-weight: 700;
+  text-align: center;
+  outline: none;
+}
+.admin-custom-level-row input:focus {
+  border-color: #ff007f;
+}
+
+.secret-stars-tag {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  background: linear-gradient(90deg, #ff007f, #00f3ff);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  display: block;
+}
+
+.secret-stars-badge {
+  font-family: 'Chakra Petch', sans-serif;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  background: linear-gradient(90deg, #ff007f, #7928ca, #00f3ff, #ffb703);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  display: inline-block;
+  animation: cosmicTextGlow 3s infinite alternate;
+}
+
+@keyframes cosmicTextGlow {
+  0% { filter: drop-shadow(0 0 4px rgba(255, 0, 127, 0.4)); }
+  100% { filter: drop-shadow(0 0 10px rgba(0, 243, 255, 0.7)); }
+}
+
+.mt-6 { margin-top: 6px; }
 
 /* 1x1x1 Boss Spawn Card Button */
 .admin-boss-spawn-btn {

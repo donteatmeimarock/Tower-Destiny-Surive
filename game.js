@@ -48,6 +48,11 @@ class GameEngine {
     this.adminTargetSlotWep = document.getElementById('admin-target-slot-wep');
     this.adminGodModeBtn = document.getElementById('admin-god-mode-btn');
 
+    // Auto Wave State
+    this.autoWave = false;
+    this.autoWaveTimer = 0;
+    this.autoWaveBtn = document.getElementById('auto-wave-btn');
+
     // Game State
     this.coins = 20; // Starting bonus for comfort
     this.hasBoughtFirstTurret = false;
@@ -89,6 +94,10 @@ class GameEngine {
     this.lightningArcs = []; // tesla coil chain lightning arcs
     this.plasmaPools = []; // orbital mortar lingering plasma pools
     this.cameraShake = 0; // camera shake timer
+
+    // Custom weapon sprites
+    this.energyBladeImg = new Image();
+    this.energyBladeImg.src = 'energy_blade_disc.png';
 
     // Spawning waves
     this.waveSpawnsRemaining = [];
@@ -181,8 +190,33 @@ class GameEngine {
       });
     });
 
+    // Auto Wave Toggle Button
+    if (this.autoWaveBtn) {
+      this.autoWaveBtn.addEventListener('click', () => {
+        this.autoWave = !this.autoWave;
+        if (this.autoWave) {
+          this.autoWaveBtn.innerText = '🔁 Auto Wave: ON';
+          this.autoWaveBtn.classList.add('active');
+          this.addDamageText(this.towerBaseX + 35, this.groundY - 140, '🔁 AUTO WAVE ENABLED', '#00ff88');
+          // If currently waiting on wave clear banner, start countdown immediately
+          if (!this.isWaveActive && !this.gameOver && !this.overlayBanner.classList.contains('hidden')) {
+            this.autoWaveTimer = 0.8;
+          }
+        } else {
+          this.autoWaveBtn.innerText = '🔁 Auto Wave: OFF';
+          this.autoWaveBtn.classList.remove('active');
+          this.autoWaveTimer = 0;
+          if (!this.gameOver) {
+            this.overlayActionBtn.innerText = 'NEXT WAVE';
+          }
+          this.addDamageText(this.towerBaseX + 35, this.groundY - 140, 'Auto Wave Disabled', '#8ca0ba');
+        }
+      });
+    }
+
     // Overlay Action Button
     this.overlayActionBtn.addEventListener('click', () => {
+      this.autoWaveTimer = 0;
       if (this.gameOver) {
         this.restartGame();
       } else {
@@ -332,14 +366,31 @@ class GameEngine {
     const levelChips = document.querySelectorAll('.level-chip');
     levelChips.forEach(chip => {
       chip.addEventListener('click', () => {
-        levelChips.forEach(c => c.classList.remove('active'));
-        chip.classList.add('active');
         const lvl = parseInt(chip.dataset.lvl) || 0;
         this.adminSetLevel(lvl);
       });
     });
 
-    // Max Current Weapon Button
+    // Secret Overload Chips (10 to 105)
+    const secretChips = document.querySelectorAll('.secret-chip');
+    secretChips.forEach(chip => {
+      chip.addEventListener('click', () => {
+        const lvl = parseInt(chip.dataset.lvl) || 0;
+        this.adminSetLevel(lvl);
+      });
+    });
+
+    // Custom Level Button & Input
+    const setCustomLvlBtn = document.getElementById('admin-set-custom-level-btn');
+    const customLvlInput = document.getElementById('admin-custom-level-input');
+    if (setCustomLvlBtn && customLvlInput) {
+      setCustomLvlBtn.addEventListener('click', () => {
+        const lvl = Math.max(0, Math.min(105, parseInt(customLvlInput.value) || 0));
+        this.adminSetLevel(lvl);
+      });
+    }
+
+    // Max Current Weapon Button (Standard Max)
     const maxCurrentBtn = document.getElementById('admin-max-current-wep-btn');
     if (maxCurrentBtn) {
       maxCurrentBtn.addEventListener('click', () => {
@@ -347,11 +398,27 @@ class GameEngine {
       });
     }
 
-    // Max All Weapons Button
+    // Overload Target Weapon Button (+100 Secret Tiers)
+    const overloadCurrentBtn = document.getElementById('admin-overload-current-wep-btn');
+    if (overloadCurrentBtn) {
+      overloadCurrentBtn.addEventListener('click', () => {
+        this.adminOverloadTargetWeapon();
+      });
+    }
+
+    // Max All Weapons Button (Standard Max)
     const maxAllBtn = document.getElementById('admin-max-all-weps-btn');
     if (maxAllBtn) {
       maxAllBtn.addEventListener('click', () => {
         this.adminMaxAllWeapons();
+      });
+    }
+
+    // OVERLOAD ALL 5 WEAPONS Button (+100 Secret Tiers on all 5 slots)
+    const overloadAllBtn = document.getElementById('admin-overload-all-weps-btn');
+    if (overloadAllBtn) {
+      overloadAllBtn.addEventListener('click', () => {
+        this.adminOverloadAllWeapons();
       });
     }
 
@@ -433,25 +500,42 @@ class GameEngine {
     if (this.adminTargetSlotWep) {
       if (slot && slot.weapon) {
         const wep = WEAPON_REGISTRY[slot.weapon];
-        const stars = '★'.repeat(slot.level);
-        this.adminTargetSlotWep.textContent = `${wep.icon} ${wep.name} (Lv.${slot.level} ${stars})`;
-        this.adminTargetSlotWep.style.color = '#00f3ff';
+        const isSecret = slot.level > wep.maxUpgrades;
+        if (isSecret) {
+          const secretTiers = slot.level - wep.maxUpgrades;
+          this.adminTargetSlotWep.innerHTML = `${wep.icon} ${wep.name} <span class="secret-stars-tag">🌌 Lv.${slot.level} [OVERLOAD +${secretTiers}]</span>`;
+        } else {
+          const stars = '★'.repeat(slot.level);
+          this.adminTargetSlotWep.textContent = `${wep.icon} ${wep.name} (Lv.${slot.level} ${stars})`;
+          this.adminTargetSlotWep.style.color = '#00f3ff';
+        }
       } else {
         this.adminTargetSlotWep.textContent = 'Empty';
         this.adminTargetSlotWep.style.color = '#8ca0ba';
       }
     }
 
+    const curLvl = (slot && slot.weapon) ? slot.level : this.adminSelectedLevel;
+
     // Update level chips
     const levelChips = document.querySelectorAll('.level-chip');
     levelChips.forEach(chip => {
       const lvl = parseInt(chip.dataset.lvl);
-      if (slot && slot.weapon) {
-        chip.classList.toggle('active', lvl === slot.level);
-      } else {
-        chip.classList.toggle('active', lvl === this.adminSelectedLevel);
-      }
+      chip.classList.toggle('active', lvl === curLvl);
     });
+
+    // Update secret chips
+    const secretChips = document.querySelectorAll('.secret-chip');
+    secretChips.forEach(chip => {
+      const lvl = parseInt(chip.dataset.lvl);
+      chip.classList.toggle('active', lvl === curLvl);
+    });
+
+    // Update custom level input value
+    const customLvlInput = document.getElementById('admin-custom-level-input');
+    if (customLvlInput && document.activeElement !== customLvlInput) {
+      customLvlInput.value = curLvl;
+    }
   }
 
   adminForceEquip() {
@@ -461,7 +545,8 @@ class GameEngine {
     const slot = this.slots[this.adminTargetSlot];
 
     slot.weapon = weaponId;
-    slot.level = Math.min(this.adminSelectedLevel, wep.maxUpgrades);
+    const maxPossible = wep.maxUpgrades + (window.SECRET_UPGRADE_LIMIT || 100);
+    slot.level = Math.min(this.adminSelectedLevel, maxPossible);
     slot.timer = 0;
     slot.subTimer = 0;
 
@@ -495,7 +580,8 @@ class GameEngine {
     const slot = this.slots[this.adminTargetSlot];
     if (slot && slot.weapon) {
       const wep = WEAPON_REGISTRY[slot.weapon];
-      slot.level = Math.min(lvl, wep.maxUpgrades);
+      const maxPossible = wep.maxUpgrades + (window.SECRET_UPGRADE_LIMIT || 100);
+      slot.level = Math.min(lvl, maxPossible);
       window.soundManager.playUpgrade();
       this.updateHUD();
       this.renderCrateSlotsUI();
@@ -509,6 +595,7 @@ class GameEngine {
     if (slot && slot.weapon) {
       const wep = WEAPON_REGISTRY[slot.weapon];
       slot.level = wep.maxUpgrades;
+      this.adminSelectedLevel = slot.level;
       window.soundManager.playUpgrade();
       this.updateHUD();
       this.renderCrateSlotsUI();
@@ -517,6 +604,25 @@ class GameEngine {
       const coords = this.getSlotCoords(this.adminTargetSlot);
       this.createExplosionParticles(coords.x + 30, coords.y, '#ffd166', 30);
       this.addDamageText(coords.x + 30, coords.y - 20, '⭐ MAXED OUT!', '#ffd166');
+    }
+  }
+
+  adminOverloadTargetWeapon() {
+    const slot = this.slots[this.adminTargetSlot];
+    if (slot && slot.weapon) {
+      const wep = WEAPON_REGISTRY[slot.weapon];
+      const maxPossible = wep.maxUpgrades + (window.SECRET_UPGRADE_LIMIT || 100);
+      slot.level = maxPossible;
+      this.adminSelectedLevel = slot.level;
+      window.soundManager.playUpgrade();
+      this.updateHUD();
+      this.renderCrateSlotsUI();
+      this.updateInspector();
+      this.updateAdminPanelSlotView();
+      const coords = this.getSlotCoords(this.adminTargetSlot);
+      this.createExplosionParticles(coords.x + 30, coords.y, '#00f3ff', 35);
+      this.createExplosionParticles(coords.x + 30, coords.y, '#ff007f', 35);
+      this.addDamageText(coords.x + 30, coords.y - 20, `🌌 OVERLOADED TO LV.${slot.level}!`, '#ff007f');
     }
   }
 
@@ -529,7 +635,7 @@ class GameEngine {
         slot.level = wep.maxUpgrades;
         upgradedAny = true;
         const coords = this.getSlotCoords(i);
-        this.createExplosionParticles(coords.x + 30, coords.y, '#ff007f', 20);
+        this.createExplosionParticles(coords.x + 30, coords.y, '#ffd166', 20);
       }
     }
     if (upgradedAny) {
@@ -539,6 +645,29 @@ class GameEngine {
       this.updateInspector();
       this.updateAdminPanelSlotView();
       this.addDamageText(this.towerBaseX + 35, this.groundY - 180, '🌟 ALL 5 CRATES MAXED!', '#00f3ff');
+    }
+  }
+
+  adminOverloadAllWeapons() {
+    let upgradedAny = false;
+    for (let i = 0; i < this.slots.length; i++) {
+      const slot = this.slots[i];
+      if (slot.weapon) {
+        const wep = WEAPON_REGISTRY[slot.weapon];
+        slot.level = wep.maxUpgrades + (window.SECRET_UPGRADE_LIMIT || 100);
+        upgradedAny = true;
+        const coords = this.getSlotCoords(i);
+        this.createExplosionParticles(coords.x + 30, coords.y, '#00f3ff', 25);
+        this.createExplosionParticles(coords.x + 30, coords.y, '#ff007f', 25);
+      }
+    }
+    if (upgradedAny) {
+      window.soundManager.playUpgrade();
+      this.updateHUD();
+      this.renderCrateSlotsUI();
+      this.updateInspector();
+      this.updateAdminPanelSlotView();
+      this.addDamageText(this.towerBaseX + 35, this.groundY - 180, '💥 ALL 5 CRATES OVERLOADED (+100)!', '#ff007f');
     }
   }
 
@@ -600,8 +729,12 @@ class GameEngine {
       
       let stars = '';
       if (slot.weapon) {
-        for (let s = 0; s < wepDef.maxUpgrades; s++) {
-          stars += s < slot.level ? '★' : '☆';
+        if (slot.level > wepDef.maxUpgrades) {
+          stars = `<span class="secret-stars-tag">🌌 Lv.${slot.level} (+${slot.level - wepDef.maxUpgrades})</span>`;
+        } else {
+          for (let s = 0; s < wepDef.maxUpgrades; s++) {
+            stars += s < slot.level ? '★' : '☆';
+          }
         }
       }
 
@@ -641,12 +774,16 @@ class GameEngine {
       this.currentWeaponInfo.classList.remove('hidden');
       this.sellWeaponBtn.classList.remove('hidden');
 
-      // Stars
-      let starStr = '';
-      for (let s = 0; s < wep.maxUpgrades; s++) {
-        starStr += s < slot.level ? '★ ' : '☆ ';
+      // Stars or Secret Overload Badge
+      if (slot.level > wep.maxUpgrades) {
+        this.inspectStars.innerHTML = `<span class="secret-stars-badge">🌌 SECRET OVERLOAD &bull; Lv. ${slot.level} (+${slot.level - wep.maxUpgrades})</span>`;
+      } else {
+        let starStr = '';
+        for (let s = 0; s < wep.maxUpgrades; s++) {
+          starStr += s < slot.level ? '★ ' : '☆ ';
+        }
+        this.inspectStars.innerText = starStr;
       }
-      this.inspectStars.innerText = starStr;
 
       // Stats calculation for current level
       const currentStats = this.getWeaponStats(slot);
@@ -700,7 +837,7 @@ class GameEngine {
       // Upgrade button status
       if (slot.level >= wep.maxUpgrades) {
         this.upgradeWeaponBtn.disabled = true;
-        this.upgradeCostTag.innerText = 'MAX LEVEL';
+        this.upgradeCostTag.innerText = slot.level > wep.maxUpgrades ? 'OVERLOADED' : 'MAX LEVEL';
       } else {
         const cost = wep.upgradeCosts[slot.level];
         this.upgradeCostTag.innerText = `🪙 ${cost}`;
@@ -851,11 +988,93 @@ class GameEngine {
 
   getWeaponStats(slot) {
     const wep = WEAPON_REGISTRY[slot.weapon];
+    if (!wep) return {};
     if (slot.level === 0) {
       return { ...wep.baseStats };
     }
-    const upg = wep.statUpgrades[slot.level - 1];
-    return { ...wep.baseStats, ...upg };
+
+    const maxNormal = wep.statUpgrades.length;
+    // Standard normal upgrades (1 to maxNormal)
+    if (slot.level <= maxNormal) {
+      const upg = wep.statUpgrades[slot.level - 1];
+      return { ...wep.baseStats, ...upg };
+    }
+
+    // 100 SECRET UPGRADES: Secret Ascension & Overload Tiers
+    // Level is greater than standard max (up to maxNormal + 100)
+    const baseStats = wep.baseStats;
+    const peakNormal = { ...baseStats, ...wep.statUpgrades[maxNormal - 1] };
+    const extra = slot.level - maxNormal; // 1 to 100+
+
+    // Clone peak stats and scale powerfully for secret tiers
+    const stats = { ...peakNormal };
+
+    // 1. Damage: scales by +35% per secret level
+    if (stats.damage !== undefined) {
+      stats.damage = peakNormal.damage * (1 + extra * 0.35);
+    }
+
+    // 2. Fire interval: progressively faster rate (clamped safely at 0.04s)
+    if (stats.interval !== undefined) {
+      stats.interval = Math.max(0.04, peakNormal.interval * Math.pow(0.985, extra));
+      stats.interval = Math.round(stats.interval * 1000) / 1000;
+    }
+
+    // 3. Tick interval (for minigun, flamethrower, chainsaw, energy blade, etc.)
+    if (stats.tickInterval !== undefined) {
+      stats.tickInterval = Math.max(0.015, peakNormal.tickInterval * Math.pow(0.99, extra));
+      stats.tickInterval = Math.round(stats.tickInterval * 1000) / 1000;
+    }
+
+    // 4. Cycle interval (for flamethrower, RPG, railgun, mortar, solar core)
+    if (stats.cycleInterval !== undefined) {
+      stats.cycleInterval = Math.max(0.6, peakNormal.cycleInterval * Math.pow(0.98, extra));
+      stats.cycleInterval = Math.round(stats.cycleInterval * 100) / 100;
+    }
+
+    // 5. Blast / AoE / Zone radius
+    if (stats.blastRadius !== undefined) {
+      stats.blastRadius = Math.min(350, peakNormal.blastRadius + extra * 1.5);
+    }
+    if (stats.slamRadius !== undefined) {
+      stats.slamRadius = Math.min(350, peakNormal.slamRadius + extra * 1.5);
+    }
+    if (stats.vortexRadius !== undefined) {
+      stats.vortexRadius = Math.min(300, peakNormal.vortexRadius + extra * 1.5);
+    }
+    if (stats.spinRadius !== undefined) {
+      stats.spinRadius = Math.min(220, peakNormal.spinRadius + extra * 1.0);
+    }
+    if (stats.auraRadius !== undefined) {
+      stats.auraRadius = Math.min(240, peakNormal.auraRadius + extra * 1.2);
+    }
+    if (stats.flareRadius !== undefined) {
+      stats.flareRadius = Math.min(360, peakNormal.flareRadius + extra * 1.8);
+    }
+
+    // 6. Special mechanics scaling
+    // Shotgun pellets: +1 pellet every 4 secret levels
+    if (stats.pellets !== undefined) {
+      stats.pellets = peakNormal.pellets + Math.floor(extra / 4);
+    }
+    // Tesla coil chains: +1 chain bounce every 3 secret levels
+    if (stats.chainCount !== undefined) {
+      stats.chainCount = peakNormal.chainCount + Math.floor(extra / 3);
+    }
+    // Toxic sprayer giant killer bonus: +0.06x per secret level
+    if (stats.giantBonus !== undefined) {
+      stats.giantBonus = Math.round((peakNormal.giantBonus + extra * 0.06) * 10) / 10;
+    }
+    // Orbital mortar pool DPS: scales with damage
+    if (stats.poolDps !== undefined) {
+      stats.poolDps = peakNormal.poolDps * (1 + extra * 0.35);
+    }
+    // Solar flare burst damage: scales with damage
+    if (stats.flareDamage !== undefined) {
+      stats.flareDamage = peakNormal.flareDamage * (1 + extra * 0.35);
+    }
+
+    return stats;
   }
 
   updateHUD() {
@@ -1524,7 +1743,23 @@ class GameEngine {
         }
         window.soundManager.playUpgrade();
         this.updateHUD();
+
+        if (this.autoWave) {
+          this.autoWaveTimer = 1.2;
+          this.overlayActionBtn.innerText = `NEXT WAVE (${this.autoWaveTimer.toFixed(1)}s)`;
+        } else {
+          this.overlayActionBtn.innerText = 'NEXT WAVE';
+        }
         this.overlayBanner.classList.remove('hidden');
+      }
+    } else if (!this.gameOver && this.autoWave && this.autoWaveTimer > 0) {
+      this.autoWaveTimer -= dt;
+      if (this.autoWaveTimer <= 0) {
+        this.autoWaveTimer = 0;
+        this.overlayBanner.classList.add('hidden');
+        this.startWave(this.wave + 1);
+      } else {
+        this.overlayActionBtn.innerText = `NEXT WAVE (${Math.max(0.1, this.autoWaveTimer).toFixed(1)}s)`;
       }
     }
 
@@ -2083,11 +2318,14 @@ class GameEngine {
     // Aim angle at closest enemy
     const target = this.getNearestEnemy(muzzleX, muzzleY, stats.range || 999);
     
-    // Default visual angle towards target
-    if (target) {
-      slot.angle = Math.atan2(target.y - muzzleY, target.x - muzzleX);
-    } else {
-      slot.angle = 0;
+    // Default visual angle towards target for aiming weapons only
+    const isSelfRotatingOrMelee = ['energy_blade', 'chainsaw', 'void_rift', 'solar_core', 'graviton_hammer'].includes(slot.weapon);
+    if (!isSelfRotatingOrMelee) {
+      if (target) {
+        slot.angle = Math.atan2(target.y - muzzleY, target.x - muzzleX);
+      } else {
+        slot.angle = 0;
+      }
     }
 
     // Spec handling:
@@ -2235,7 +2473,7 @@ class GameEngine {
       // 7. CHAINSAW: Keeps spinning forever. Every 0.1s touching deals 0.3 dmg
       case 'chainsaw': {
         slot.subTimer += dt;
-        slot.angle += stats.rotSpeed * dt;
+        slot.angle = ((slot.angle || 0) + (stats.rotSpeed || 10) * dt) % (Math.PI * 2);
         if (slot.subTimer >= stats.tickInterval) {
           slot.subTimer = 0;
           let hitAny = false;
@@ -2261,12 +2499,13 @@ class GameEngine {
       // 8. ENERGY BLADE: Keeps spinning forever. Every 0.1s touching deals 2 dmg
       case 'energy_blade': {
         slot.subTimer += dt;
-        slot.angle += stats.rotSpeed * dt;
+        slot.angle = ((slot.angle || 0) + (stats.rotSpeed || 16) * dt) % (Math.PI * 2);
         if (slot.subTimer >= stats.tickInterval) {
           slot.subTimer = 0;
           let hitAny = false;
-          const meleeMountX = coords.x + this.crateWidth / 2 + 15;
-          const minClearance = stats.spinRadius + 6;
+          const meleeMountX = coords.x + this.crateWidth / 2 + 18;
+          const visualRadius = Math.min(34, 24 + slot.level * 2);
+          const minClearance = visualRadius + 6;
           const meleeMountY = Math.min(coords.y, this.groundY - minClearance);
 
           for (let enemy of this.enemies) {
@@ -2928,6 +3167,7 @@ class GameEngine {
 
   restartGame() {
     this.gameOver = false;
+    this.autoWaveTimer = 0;
     this.towerHp = this.maxTowerHp;
     this.coins = 20;
     this.hasBoughtFirstTurret = false;
@@ -3123,16 +3363,37 @@ class GameEngine {
     // Close range spinning weapons are mounted on an extended front mechanical arm (x + 35)
     // so they spin completely free in open air and never hit or overlap the crate body!
     if (slot.weapon === 'chainsaw' || slot.weapon === 'energy_blade' || slot.weapon === 'void_rift' || slot.weapon === 'graviton_hammer' || slot.weapon === 'solar_core') {
-      const mountX = x + this.crateWidth / 2 + 15;
-      // Ensure the weapon center is elevated high enough above groundY
-      const radius = stats.spinRadius || 36;
+      const mountX = x + this.crateWidth / 2 + 18;
+      // Ensure the weapon center is elevated high enough above groundY so it NEVER clips the ground!
+      let radius = 24;
+      if (slot.weapon === 'energy_blade') {
+        radius = Math.min(32, 22 + slot.level * 2);
+      } else if (slot.weapon === 'chainsaw') {
+        radius = 26;
+      } else {
+        radius = Math.min(40, stats.spinRadius || stats.vortexRadius || stats.auraRadius || 36);
+      }
       const minClearance = radius + 6;
       const mountY = Math.min(y, this.groundY - minClearance);
       
-      // Draw mechanical mounting arm extending from the crate
-      this.ctx.fillStyle = '#2b2d42';
-      this.ctx.fillRect(x + this.crateWidth / 2 - 4, mountY - 4, 20, 8);
-      this.ctx.fillStyle = '#8d99ae';
+      // Draw sleek mechanical mounting bracket connecting from crate front to mount
+      this.ctx.strokeStyle = '#2b2d42';
+      this.ctx.lineWidth = 6;
+      this.ctx.lineCap = 'round';
+      this.ctx.beginPath();
+      this.ctx.moveTo(x + this.crateWidth / 2 - 2, y);
+      this.ctx.lineTo(mountX, mountY);
+      this.ctx.stroke();
+
+      this.ctx.strokeStyle = slot.weapon === 'energy_blade' ? '#00f3ff' : '#8d99ae';
+      this.ctx.lineWidth = 2;
+      this.ctx.beginPath();
+      this.ctx.moveTo(x + this.crateWidth / 2 - 2, y);
+      this.ctx.lineTo(mountX, mountY);
+      this.ctx.stroke();
+
+      // Hub pivot bearing
+      this.ctx.fillStyle = '#1d3557';
       this.ctx.beginPath();
       this.ctx.arc(mountX, mountY, 6, 0, Math.PI * 2);
       this.ctx.fill();
@@ -3163,54 +3424,90 @@ class GameEngine {
     }
 
     if (slot.weapon === 'energy_blade') {
-      // 360-degree spinning sleek dual plasma blades
-      this.ctx.rotate(slot.angle % (Math.PI * 2));
+      // 360-degree spinning circular saw energy blade disc matching the reference image
+      const spinAngle = (slot.angle || 0) % (Math.PI * 2);
+      this.ctx.rotate(spinAngle);
 
-      const bladeLen = stats.spinRadius;
-      const bladeW = 4;
+      const discRadius = Math.min(32, 22 + slot.level * 2);
 
-      // Glowing cyan plasma aura
-      this.ctx.shadowColor = '#00f3ff';
-      this.ctx.shadowBlur = 12;
+      // Check if preloaded sprite disc is ready
+      if (this.energyBladeImg && this.energyBladeImg.complete && this.energyBladeImg.naturalWidth > 0) {
+        this.ctx.save();
+        // Cyan energetic plasma rim aura
+        this.ctx.shadowColor = '#00f3ff';
+        this.ctx.shadowBlur = 15;
 
-      // Outer plasma blade glow (forward and backward blades)
-      this.ctx.fillStyle = 'rgba(0, 243, 255, 0.9)';
-      // Blade 1
-      this.ctx.beginPath();
-      this.ctx.moveTo(8, -bladeW);
-      this.ctx.lineTo(bladeLen, 0);
-      this.ctx.lineTo(8, bladeW);
-      this.ctx.closePath();
-      this.ctx.fill();
+        // Draw the circular metallic saw disc
+        this.ctx.drawImage(this.energyBladeImg, -discRadius, -discRadius, discRadius * 2, discRadius * 2);
 
-      // Blade 2 (opposite 180 deg)
-      this.ctx.beginPath();
-      this.ctx.moveTo(-8, -bladeW);
-      this.ctx.lineTo(-bladeLen, 0);
-      this.ctx.lineTo(-8, bladeW);
-      this.ctx.closePath();
-      this.ctx.fill();
+        // High-frequency energy discharge border
+        this.ctx.strokeStyle = 'rgba(0, 243, 255, 0.7)';
+        this.ctx.lineWidth = 1.8;
+        this.ctx.beginPath();
+        this.ctx.arc(0, 0, discRadius - 1, 0, Math.PI * 2);
+        this.ctx.stroke();
 
-      // White hot energy blade core
-      this.ctx.fillStyle = '#ffffff';
-      this.ctx.fillRect(8, -1.2, bladeLen - 12, 2.4);
-      this.ctx.fillRect(-bladeLen + 4, -1.2, bladeLen - 12, 2.4);
+        // Gleaming cyan central core spark
+        this.ctx.fillStyle = '#00f3ff';
+        this.ctx.beginPath();
+        this.ctx.arc(0, 0, 3.5, 0, Math.PI * 2);
+        this.ctx.fill();
 
-      // Central emitter ring & core
-      this.ctx.fillStyle = '#1d3557';
-      this.ctx.beginPath();
-      this.ctx.arc(0, 0, 8, 0, Math.PI * 2);
-      this.ctx.fill();
+        this.ctx.fillStyle = '#ffffff';
+        this.ctx.beginPath();
+        this.ctx.arc(0, 0, 1.8, 0, Math.PI * 2);
+        this.ctx.fill();
 
-      this.ctx.fillStyle = '#00f3ff';
-      this.ctx.beginPath();
-      this.ctx.arc(0, 0, 5, 0, Math.PI * 2);
-      this.ctx.fill();
+        this.ctx.restore();
+      } else {
+        // High-fidelity procedural concentric metallic ripple disc fallback
+        this.ctx.save();
+        this.ctx.shadowColor = '#00f3ff';
+        this.ctx.shadowBlur = 12;
 
-      this.ctx.fillStyle = '#ffffff';
-      this.ctx.beginPath();
-      this.ctx.arc(0, 0, 2.5, 0, Math.PI * 2);
-      this.ctx.fill();
+        // Dark outer rim
+        this.ctx.fillStyle = '#1c1f26';
+        this.ctx.beginPath();
+        this.ctx.arc(0, 0, discRadius, 0, Math.PI * 2);
+        this.ctx.fill();
+
+        // Concentric chrome grooves
+        const rings = [0.92, 0.82, 0.72, 0.62, 0.50, 0.38, 0.25];
+        rings.forEach((rRatio, idx) => {
+          this.ctx.strokeStyle = idx % 2 === 0 ? 'rgba(230, 235, 245, 0.85)' : 'rgba(40, 45, 55, 0.9)';
+          this.ctx.lineWidth = 2.2;
+          this.ctx.beginPath();
+          this.ctx.arc(0, 0, discRadius * rRatio, 0, Math.PI * 2);
+          this.ctx.stroke();
+        });
+
+        // 4-point cross centerpiece hub
+        this.ctx.fillStyle = '#e8ecf2';
+        for (let a = 0; a < 4; a++) {
+          this.ctx.save();
+          this.ctx.rotate((Math.PI / 2) * a);
+          this.ctx.beginPath();
+          this.ctx.moveTo(-2, 0);
+          this.ctx.lineTo(0, discRadius * 0.24);
+          this.ctx.lineTo(2, 0);
+          this.ctx.closePath();
+          this.ctx.fill();
+          this.ctx.restore();
+        }
+
+        // Inner glowing core
+        this.ctx.fillStyle = '#00f3ff';
+        this.ctx.beginPath();
+        this.ctx.arc(0, 0, 3.5, 0, Math.PI * 2);
+        this.ctx.fill();
+
+        this.ctx.fillStyle = '#ffffff';
+        this.ctx.beginPath();
+        this.ctx.arc(0, 0, 1.8, 0, Math.PI * 2);
+        this.ctx.fill();
+
+        this.ctx.restore();
+      }
 
       this.ctx.restore();
       return;

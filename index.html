@@ -46,6 +46,7 @@
       </div>
 
       <div class="controls-zone">
+        <button id="auto-wave-btn" class="hud-btn auto-wave-btn" title="Toggle Auto Wave (Automatically advances to the next wave)">🔁 Auto Wave: OFF</button>
         <button id="admin-btn" class="hud-btn admin-btn" title="Open Admin Panel">⚡ ADMIN</button>
         <button id="speed-btn" class="hud-btn" title="Toggle Speed">1x ⏩</button>
         <button id="pause-btn" class="hud-btn" title="Pause Game">⏸️</button>
@@ -212,18 +213,43 @@
             </div>
 
             <div class="admin-upgrades-sub">
-              <span class="sub-label">Set Upgrade Level:</span>
+              <div class="secret-upgrades-header">
+                <span class="sub-label">Upgrade Level:</span>
+                <span class="secret-tag">🔒 100 SECRET TIERS</span>
+              </div>
+              
+              <!-- Standard Level Chips -->
               <div class="admin-level-buttons" id="admin-level-buttons">
                 <button class="level-chip active" data-lvl="0">0 (Base)</button>
                 <button class="level-chip" data-lvl="1">★ 1</button>
-                <button class="level-chip" data-lvl="2">★★ 2</button>
-                <button class="level-chip" data-lvl="3">★★★ 3</button>
-                <button class="level-chip" data-lvl="4">★★★★ 4</button>
-                <button class="level-chip" data-lvl="5">★★★★★ 5</button>
+                <button class="level-chip" data-lvl="2">★ 2</button>
+                <button class="level-chip" data-lvl="3">★ 3</button>
+                <button class="level-chip" data-lvl="4">★ 4</button>
+                <button class="level-chip" data-lvl="5">★ 5</button>
               </div>
+
+              <!-- Secret Overload Jump Chips (Tier 10 to 105) -->
+              <div class="admin-secret-chips mt-6" id="admin-secret-chips">
+                <button class="secret-chip" data-lvl="10">🌌 Lv.10</button>
+                <button class="secret-chip" data-lvl="25">🌌 Lv.25</button>
+                <button class="secret-chip" data-lvl="50">🌌 Lv.50</button>
+                <button class="secret-chip" data-lvl="75">⚡ Lv.75</button>
+                <button class="secret-chip" data-lvl="100">⚡ Lv.100</button>
+                <button class="secret-chip max-secret" data-lvl="105">💥 Lv.105 (MAX)</button>
+              </div>
+
+              <!-- Custom Level Direct Input (0–105) -->
+              <div class="admin-custom-level-row mt-6">
+                <span class="secret-input-label">Custom Lv (0–105):</span>
+                <input type="number" id="admin-custom-level-input" min="0" max="105" value="105" />
+                <button id="admin-set-custom-level-btn" class="admin-secondary-btn">Set Lv</button>
+              </div>
+
               <div class="admin-grid-buttons mt-8">
-                <button id="admin-max-current-wep-btn" class="admin-action-btn gold-btn">⭐ Max Target Weapon</button>
-                <button id="admin-max-all-weps-btn" class="admin-action-btn godly-gradient-btn">🌟 Max All 5 Crates!</button>
+                <button id="admin-max-current-wep-btn" class="admin-action-btn gold-btn">⭐ Standard Max</button>
+                <button id="admin-overload-current-wep-btn" class="admin-action-btn purple-btn">🌌 Overload (+100)</button>
+                <button id="admin-max-all-weps-btn" class="admin-action-btn cyan-btn">🌟 Max All (Normal)</button>
+                <button id="admin-overload-all-weps-btn" class="admin-action-btn godly-gradient-btn">💥 OVERLOAD ALL 5 (+100)!</button>
               </div>
             </div>
           </div>

@@ -7,7 +7,7 @@
 //  4. "Sniper Rifle": 18 dmg every 3.5s. 5 upgrades. High-velocity precision rifle.
 //  5. "Combat Shotgun": 5 pellets x 2.2 dmg every 1.1s. 5 upgrades. Wide close-range cone spread.
 // GODLY GUNS:
-//  6. "Energy Railgun": Charge 10s, shoots blue ray piercing 75 dmg. 5 upgrades.
+//  6. "Energy Railgun": Charge 10s, shoots blue ray piercing 750 dmg. 5 upgrades.
 //  7. "RPG": 5s wait, shoots exploding grenade dealing 250 dmg total split across all enemies hit. 5 upgrades.
 //  8. "Tesla Coil": 35 dmg every 4.0s, chain lightning bouncing between up to 5 enemies! 5 upgrades.
 //  9. "Cryo Cannon": 40 dmg every 2.8s in 90px AoE, slowing enemies by 65%. 5 upgrades.
@@ -130,7 +130,7 @@ const WEAPON_REGISTRY = {
     maxUpgrades: 5,
     description: 'Charge for 10 sec, then unleash a devastating blue piercing beam!',
     baseStats: {
-      damage: 75,
+      damage: 750,
       interval: 10.0, // 10s charge
       range: 1200, // pierces all the way across the screen
       piercing: true,
@@ -139,11 +139,11 @@ const WEAPON_REGISTRY = {
     },
     upgradeCosts: [100, 175, 275, 400, 600],
     statUpgrades: [
-      { damage: 120, interval: 9.0 },
-      { damage: 180, interval: 8.0 },
-      { damage: 260, interval: 7.2 },
-      { damage: 370, interval: 6.5 },
-      { damage: 520, interval: 5.5 }
+      { damage: 1200, interval: 9.0 },
+      { damage: 1800, interval: 8.0 },
+      { damage: 2600, interval: 7.2 },
+      { damage: 3700, interval: 6.5 },
+      { damage: 5200, interval: 5.5 }
     ]
   },
 
@@ -461,7 +461,7 @@ const WEAPON_REGISTRY = {
   }
 };
 
-const SECRET_UPGRADE_LIMIT = 100;
+const SECRET_UPGRADE_LIMIT = 1000;
 
 window.WEAPON_REGISTRY = WEAPON_REGISTRY;
 window.SECRET_UPGRADE_LIMIT = SECRET_UPGRADE_LIMIT;

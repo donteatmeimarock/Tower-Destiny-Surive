@@ -385,7 +385,7 @@ class GameEngine {
     const customLvlInput = document.getElementById('admin-custom-level-input');
     if (setCustomLvlBtn && customLvlInput) {
       setCustomLvlBtn.addEventListener('click', () => {
-        const lvl = Math.max(0, Math.min(105, parseInt(customLvlInput.value) || 0));
+        const lvl = Math.max(0, Math.min(1005, parseInt(customLvlInput.value) || 0));
         this.adminSetLevel(lvl);
       });
     }
@@ -545,7 +545,7 @@ class GameEngine {
     const slot = this.slots[this.adminTargetSlot];
 
     slot.weapon = weaponId;
-    const maxPossible = wep.maxUpgrades + (window.SECRET_UPGRADE_LIMIT || 100);
+    const maxPossible = wep.maxUpgrades + (window.SECRET_UPGRADE_LIMIT || 1000);
     slot.level = Math.min(this.adminSelectedLevel, maxPossible);
     slot.timer = 0;
     slot.subTimer = 0;
@@ -580,7 +580,7 @@ class GameEngine {
     const slot = this.slots[this.adminTargetSlot];
     if (slot && slot.weapon) {
       const wep = WEAPON_REGISTRY[slot.weapon];
-      const maxPossible = wep.maxUpgrades + (window.SECRET_UPGRADE_LIMIT || 100);
+      const maxPossible = wep.maxUpgrades + (window.SECRET_UPGRADE_LIMIT || 1000);
       slot.level = Math.min(lvl, maxPossible);
       window.soundManager.playUpgrade();
       this.updateHUD();
@@ -611,7 +611,7 @@ class GameEngine {
     const slot = this.slots[this.adminTargetSlot];
     if (slot && slot.weapon) {
       const wep = WEAPON_REGISTRY[slot.weapon];
-      const maxPossible = wep.maxUpgrades + (window.SECRET_UPGRADE_LIMIT || 100);
+      const maxPossible = wep.maxUpgrades + (window.SECRET_UPGRADE_LIMIT || 1000);
       slot.level = maxPossible;
       this.adminSelectedLevel = slot.level;
       window.soundManager.playUpgrade();
@@ -654,7 +654,7 @@ class GameEngine {
       const slot = this.slots[i];
       if (slot.weapon) {
         const wep = WEAPON_REGISTRY[slot.weapon];
-        slot.level = wep.maxUpgrades + (window.SECRET_UPGRADE_LIMIT || 100);
+        slot.level = wep.maxUpgrades + (window.SECRET_UPGRADE_LIMIT || 1000);
         upgradedAny = true;
         const coords = this.getSlotCoords(i);
         this.createExplosionParticles(coords.x + 30, coords.y, '#00f3ff', 25);
@@ -667,7 +667,7 @@ class GameEngine {
       this.renderCrateSlotsUI();
       this.updateInspector();
       this.updateAdminPanelSlotView();
-      this.addDamageText(this.towerBaseX + 35, this.groundY - 180, '💥 ALL 5 CRATES OVERLOADED (+100)!', '#ff007f');
+      this.addDamageText(this.towerBaseX + 35, this.groundY - 180, '💥 ALL 5 CRATES OVERLOADED (+1,000)!', '#ff007f');
     }
   }
 
@@ -1000,11 +1000,11 @@ class GameEngine {
       return { ...wep.baseStats, ...upg };
     }
 
-    // 100 SECRET UPGRADES: Secret Ascension & Overload Tiers
-    // Level is greater than standard max (up to maxNormal + 100)
+    // 1,000 SECRET UPGRADES: Secret Ascension & Overload Tiers
+    // Level is greater than standard max (up to maxNormal + 1000)
     const baseStats = wep.baseStats;
     const peakNormal = { ...baseStats, ...wep.statUpgrades[maxNormal - 1] };
-    const extra = slot.level - maxNormal; // 1 to 100+
+    const extra = slot.level - maxNormal; // 1 to 1000+
 
     // Clone peak stats and scale powerfully for secret tiers
     const stats = { ...peakNormal };
@@ -1028,42 +1028,42 @@ class GameEngine {
 
     // 4. Cycle interval (for flamethrower, RPG, railgun, mortar, solar core)
     if (stats.cycleInterval !== undefined) {
-      stats.cycleInterval = Math.max(0.6, peakNormal.cycleInterval * Math.pow(0.98, extra));
+      stats.cycleInterval = Math.max(0.4, peakNormal.cycleInterval * Math.pow(0.98, extra));
       stats.cycleInterval = Math.round(stats.cycleInterval * 100) / 100;
     }
 
     // 5. Blast / AoE / Zone radius
     if (stats.blastRadius !== undefined) {
-      stats.blastRadius = Math.min(350, peakNormal.blastRadius + extra * 1.5);
+      stats.blastRadius = Math.min(500, peakNormal.blastRadius + extra * 0.6);
     }
     if (stats.slamRadius !== undefined) {
-      stats.slamRadius = Math.min(350, peakNormal.slamRadius + extra * 1.5);
+      stats.slamRadius = Math.min(500, peakNormal.slamRadius + extra * 0.6);
     }
     if (stats.vortexRadius !== undefined) {
-      stats.vortexRadius = Math.min(300, peakNormal.vortexRadius + extra * 1.5);
+      stats.vortexRadius = Math.min(420, peakNormal.vortexRadius + extra * 0.5);
     }
     if (stats.spinRadius !== undefined) {
-      stats.spinRadius = Math.min(220, peakNormal.spinRadius + extra * 1.0);
+      stats.spinRadius = Math.min(320, peakNormal.spinRadius + extra * 0.4);
     }
     if (stats.auraRadius !== undefined) {
-      stats.auraRadius = Math.min(240, peakNormal.auraRadius + extra * 1.2);
+      stats.auraRadius = Math.min(350, peakNormal.auraRadius + extra * 0.4);
     }
     if (stats.flareRadius !== undefined) {
-      stats.flareRadius = Math.min(360, peakNormal.flareRadius + extra * 1.8);
+      stats.flareRadius = Math.min(500, peakNormal.flareRadius + extra * 0.6);
     }
 
     // 6. Special mechanics scaling
-    // Shotgun pellets: +1 pellet every 4 secret levels
+    // Shotgun pellets: +1 pellet every 8 secret levels
     if (stats.pellets !== undefined) {
-      stats.pellets = peakNormal.pellets + Math.floor(extra / 4);
+      stats.pellets = peakNormal.pellets + Math.floor(extra / 8);
     }
-    // Tesla coil chains: +1 chain bounce every 3 secret levels
+    // Tesla coil chains: +1 chain bounce every 6 secret levels
     if (stats.chainCount !== undefined) {
-      stats.chainCount = peakNormal.chainCount + Math.floor(extra / 3);
+      stats.chainCount = peakNormal.chainCount + Math.floor(extra / 6);
     }
-    // Toxic sprayer giant killer bonus: +0.06x per secret level
+    // Toxic sprayer giant killer bonus: +0.05x per secret level
     if (stats.giantBonus !== undefined) {
-      stats.giantBonus = Math.round((peakNormal.giantBonus + extra * 0.06) * 10) / 10;
+      stats.giantBonus = Math.round((peakNormal.giantBonus + extra * 0.05) * 10) / 10;
     }
     // Orbital mortar pool DPS: scales with damage
     if (stats.poolDps !== undefined) {

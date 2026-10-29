@@ -215,7 +215,7 @@
             <div class="admin-upgrades-sub">
               <div class="secret-upgrades-header">
                 <span class="sub-label">Upgrade Level:</span>
-                <span class="secret-tag">🔒 100 SECRET TIERS</span>
+                <span class="secret-tag">🔒 1,000 SECRET TIERS</span>
               </div>
               
               <!-- Standard Level Chips -->
@@ -228,28 +228,28 @@
                 <button class="level-chip" data-lvl="5">★ 5</button>
               </div>
 
-              <!-- Secret Overload Jump Chips (Tier 10 to 105) -->
+              <!-- Secret Overload Jump Chips (Tier 25 to 1005) -->
               <div class="admin-secret-chips mt-6" id="admin-secret-chips">
-                <button class="secret-chip" data-lvl="10">🌌 Lv.10</button>
                 <button class="secret-chip" data-lvl="25">🌌 Lv.25</button>
-                <button class="secret-chip" data-lvl="50">🌌 Lv.50</button>
-                <button class="secret-chip" data-lvl="75">⚡ Lv.75</button>
-                <button class="secret-chip" data-lvl="100">⚡ Lv.100</button>
-                <button class="secret-chip max-secret" data-lvl="105">💥 Lv.105 (MAX)</button>
+                <button class="secret-chip" data-lvl="100">🌌 Lv.100</button>
+                <button class="secret-chip" data-lvl="250">⚡ Lv.250</button>
+                <button class="secret-chip" data-lvl="500">⚡ Lv.500</button>
+                <button class="secret-chip" data-lvl="750">💥 Lv.750</button>
+                <button class="secret-chip max-secret" data-lvl="1005">💥 Lv.1005 (MAX)</button>
               </div>
 
-              <!-- Custom Level Direct Input (0–105) -->
+              <!-- Custom Level Direct Input (0–1005) -->
               <div class="admin-custom-level-row mt-6">
-                <span class="secret-input-label">Custom Lv (0–105):</span>
-                <input type="number" id="admin-custom-level-input" min="0" max="105" value="105" />
+                <span class="secret-input-label">Custom Lv (0–1005):</span>
+                <input type="number" id="admin-custom-level-input" min="0" max="1005" value="1005" />
                 <button id="admin-set-custom-level-btn" class="admin-secondary-btn">Set Lv</button>
               </div>
 
               <div class="admin-grid-buttons mt-8">
                 <button id="admin-max-current-wep-btn" class="admin-action-btn gold-btn">⭐ Standard Max</button>
-                <button id="admin-overload-current-wep-btn" class="admin-action-btn purple-btn">🌌 Overload (+100)</button>
+                <button id="admin-overload-current-wep-btn" class="admin-action-btn purple-btn">🌌 Overload (+1,000)</button>
                 <button id="admin-max-all-weps-btn" class="admin-action-btn cyan-btn">🌟 Max All (Normal)</button>
-                <button id="admin-overload-all-weps-btn" class="admin-action-btn godly-gradient-btn">💥 OVERLOAD ALL 5 (+100)!</button>
+                <button id="admin-overload-all-weps-btn" class="admin-action-btn godly-gradient-btn">💥 OVERLOAD ALL 5 (+1,000)!</button>
               </div>
             </div>
           </div>
@@ -276,6 +276,11 @@
             <div class="admin-input-row mt-12">
               <input type="number" id="admin-wave-jump-input" placeholder="Jump to wave..." min="1" value="5" />
               <button id="admin-wave-jump-btn" class="admin-secondary-btn">Jump Wave</button>
+            </div>
+
+            <div class="admin-grid-buttons mt-12">
+              <button id="admin-speed-20x-btn" class="admin-action-btn cyan-btn">⚡ 20x Speed</button>
+              <button id="admin-speed-100x-btn" class="admin-action-btn purple-btn">🌌 100x Speed</button>
             </div>
           </div>
         </div>

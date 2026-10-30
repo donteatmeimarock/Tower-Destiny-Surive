@@ -46,6 +46,7 @@
       </div>
 
       <div class="controls-zone">
+        <button id="run-vault-btn" class="hud-btn vault-btn" title="Open Run Vault & Profiles">🔑 RUN: NONE</button>
         <button id="auto-wave-btn" class="hud-btn auto-wave-btn" title="Toggle Auto Wave (Automatically advances to the next wave)">🔁 Auto Wave: OFF</button>
         <button id="admin-btn" class="hud-btn admin-btn" title="Open Admin Panel">⚡ ADMIN</button>
         <button id="speed-btn" class="hud-btn" title="Toggle Speed">1x ⏩</button>
@@ -129,6 +130,74 @@
       <span class="hint-text">💡 Tip: Equip weapons like Sniper Rifle, Tesla Coil, Buzz Saw, Graviton Hammer, or Void Rift to dominate every wave!</span>
       <span class="credits">Tower Destiny Survive &bull; Antigravity Edition</span>
     </footer>
+
+    <!-- Run Vault & Secret Password Modal -->
+    <div id="run-vault-modal" class="modal-backdrop hidden">
+      <div class="run-vault-card">
+        <div class="vault-header">
+          <div class="vault-title-row">
+            <span class="vault-icon">🔑</span>
+            <div>
+              <h3>SECRET RUN VAULT</h3>
+              <span class="vault-badge">SAVE CODE &amp; PASSWORD SYSTEM</span>
+            </div>
+          </div>
+          <button id="run-vault-close-btn" class="modal-close-btn" title="Close">&times;</button>
+        </div>
+
+        <!-- Active run banner -->
+        <div id="vault-active-banner" class="vault-active-banner hidden">
+          <div class="active-run-meta">
+            <span class="active-label">CURRENT RUN:</span>
+            <span id="vault-current-pass" class="active-pass">NONE</span>
+            <span class="active-stats" id="vault-current-stats">Wave 1 &bull; 100 🪙</span>
+          </div>
+          <div class="active-run-actions">
+            <button id="vault-save-now-btn" class="vault-mini-btn gold">💾 Save Run</button>
+            <button id="vault-copy-code-btn" class="vault-mini-btn cyan">📋 Copy Save Code</button>
+          </div>
+        </div>
+
+        <!-- Navigation Tabs -->
+        <div class="vault-tabs">
+          <button class="vault-tab-btn active" data-tab="create">🆕 Create Secret Password</button>
+          <button class="vault-tab-btn" data-tab="load">🔓 Enter Secret Password</button>
+        </div>
+
+        <!-- Tab 1: Create New Run -->
+        <div id="vault-tab-create" class="vault-tab-content">
+          <div class="vault-form-box">
+            <h4>Start a New Run with a Secret Password</h4>
+            <p class="vault-form-desc">
+              Create your unique secret password below. <strong>It must be one that hasn't been selected yet!</strong>
+              Entering this password later will load your run.
+            </p>
+            <div class="vault-input-group">
+              <input type="text" id="vault-new-pass-input" placeholder="Create your unique secret password..." autocomplete="off" maxlength="40" />
+              <button id="vault-create-btn" class="glow-button">START RUN 🚀</button>
+            </div>
+            <div id="vault-create-error" class="vault-error-msg hidden"></div>
+            <div id="vault-create-success" class="vault-success-msg hidden"></div>
+          </div>
+        </div>
+
+        <!-- Tab 2: Load Run by Password -->
+        <div id="vault-tab-load" class="vault-tab-content hidden">
+          <div class="vault-form-box">
+            <h4>Enter Your Secret Password</h4>
+            <p class="vault-form-desc">
+              Enter your secret password below to look up your save code in the vault and load your saved run.
+            </p>
+            <div class="vault-input-group">
+              <input type="text" id="vault-load-pass-input" placeholder="Enter your secret password..." autocomplete="off" />
+              <button id="vault-load-btn" class="glow-button cyan-glow">LOAD RUN ▶️</button>
+            </div>
+            <div id="vault-load-error" class="vault-error-msg hidden"></div>
+            <div id="vault-load-success" class="vault-success-msg hidden"></div>
+          </div>
+        </div>
+      </div>
+    </div>
 
     <!-- Admin Authentication Password Modal -->
     <div id="admin-auth-modal" class="modal-backdrop hidden">
@@ -215,7 +284,7 @@
             <div class="admin-upgrades-sub">
               <div class="secret-upgrades-header">
                 <span class="sub-label">Upgrade Level:</span>
-                <span class="secret-tag">🔒 1,000 SECRET TIERS</span>
+                <span class="secret-tag">🔒 1,000,000 SECRET TIERS</span>
               </div>
               
               <!-- Standard Level Chips -->
@@ -228,28 +297,28 @@
                 <button class="level-chip" data-lvl="5">★ 5</button>
               </div>
 
-              <!-- Secret Overload Jump Chips (Tier 25 to 1005) -->
+              <!-- Secret Overload Jump Chips (Tier 100 to 1,000,000) -->
               <div class="admin-secret-chips mt-6" id="admin-secret-chips">
-                <button class="secret-chip" data-lvl="25">🌌 Lv.25</button>
                 <button class="secret-chip" data-lvl="100">🌌 Lv.100</button>
-                <button class="secret-chip" data-lvl="250">⚡ Lv.250</button>
-                <button class="secret-chip" data-lvl="500">⚡ Lv.500</button>
-                <button class="secret-chip" data-lvl="750">💥 Lv.750</button>
-                <button class="secret-chip max-secret" data-lvl="1005">💥 Lv.1005 (MAX)</button>
+                <button class="secret-chip" data-lvl="1000">⚡ Lv.1K</button>
+                <button class="secret-chip" data-lvl="10000">⚡ Lv.10K</button>
+                <button class="secret-chip" data-lvl="100000">💥 Lv.100K</button>
+                <button class="secret-chip" data-lvl="500000">💥 Lv.500K</button>
+                <button class="secret-chip max-secret" data-lvl="1000000">💥 1M (MAX)</button>
               </div>
 
-              <!-- Custom Level Direct Input (0–1005) -->
+              <!-- Custom Level Direct Input (0–1,000,000) -->
               <div class="admin-custom-level-row mt-6">
-                <span class="secret-input-label">Custom Lv (0–1005):</span>
-                <input type="number" id="admin-custom-level-input" min="0" max="1005" value="1005" />
+                <span class="secret-input-label">Custom Lv (0–1,000,000):</span>
+                <input type="number" id="admin-custom-level-input" min="0" max="1000000" value="1000000" />
                 <button id="admin-set-custom-level-btn" class="admin-secondary-btn">Set Lv</button>
               </div>
 
               <div class="admin-grid-buttons mt-8">
                 <button id="admin-max-current-wep-btn" class="admin-action-btn gold-btn">⭐ Standard Max</button>
-                <button id="admin-overload-current-wep-btn" class="admin-action-btn purple-btn">🌌 Overload (+1,000)</button>
+                <button id="admin-overload-current-wep-btn" class="admin-action-btn purple-btn">🌌 Overload (+1M)</button>
                 <button id="admin-max-all-weps-btn" class="admin-action-btn cyan-btn">🌟 Max All (Normal)</button>
-                <button id="admin-overload-all-weps-btn" class="admin-action-btn godly-gradient-btn">💥 OVERLOAD ALL 5 (+1,000)!</button>
+                <button id="admin-overload-all-weps-btn" class="admin-action-btn godly-gradient-btn">💥 OVERLOAD ALL 5 (+1,000,000)!</button>
               </div>
             </div>
           </div>
@@ -268,6 +337,16 @@
               <span class="boss-btn-badge">SECRET</span>
             </button>
 
+            <!-- Weak Weapon Dummy Boss Spawn Button -->
+            <button id="admin-spawn-dummy-btn" class="admin-boss-spawn-btn dummy-boss-btn mt-6">
+              <span class="boss-btn-icon">🎯</span>
+              <div class="boss-btn-info">
+                <span class="boss-btn-title">SPAWN WEAK WEAPON DUMMY</span>
+                <span class="boss-btn-subtitle">1 Billion HP &bull; Deals 500 Dmg / 10s</span>
+              </div>
+              <span class="boss-btn-badge dummy-badge">DUMMY</span>
+            </button>
+
             <div class="admin-grid-buttons mt-12">
               <button id="admin-kill-all-btn" class="admin-action-btn red-btn">💀 Kill All Enemies</button>
               <button id="admin-next-wave-btn" class="admin-action-btn cyan-btn">🌊 Force Next Wave</button>
@@ -283,6 +362,26 @@
               <button id="admin-speed-100x-btn" class="admin-action-btn purple-btn">🌌 100x Speed</button>
             </div>
           </div>
+
+          <!-- Row 2: Secret Run Vault Registry (Admin Only) -->
+          <div class="admin-section admin-vault-full-section">
+            <div class="vault-file-header">
+              <div class="vault-header-title-wrap">
+                <span class="vault-sec-icon">📁</span>
+                <div>
+                  <h4 class="section-title">SECRET RUN VAULT REGISTRY (<span id="vault-runs-count">1</span> RUNS)</h4>
+                  <p class="vault-file-desc">🔒 Admin Only: Every registered secret password, stats, and save code is stored here</p>
+                </div>
+              </div>
+              <div class="vault-file-actions">
+                <button id="vault-download-json-btn" class="vault-mini-btn gold">📥 Download saves.json</button>
+                <button id="vault-copy-all-json-btn" class="vault-mini-btn cyan">📋 Copy All JSON</button>
+              </div>
+            </div>
+            <div id="vault-entries-list" class="vault-entries-list admin-vault-entries">
+              <!-- Dynamically populated with all registered runs, passwords, and save codes -->
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -290,6 +389,7 @@
 
   <script src="audio.js"></script>
   <script src="weapons.js"></script>
+  <script src="saves.js"></script>
   <script src="game.js"></script>
 </body>
 </html>

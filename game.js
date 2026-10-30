@@ -53,6 +53,30 @@ class GameEngine {
     this.autoWaveTimer = 0;
     this.autoWaveBtn = document.getElementById('auto-wave-btn');
 
+    // Run Vault & Secret Password State & UI Elements
+    this.currentRunPassword = null;
+    this.saveVault = {};
+    this.runVaultBtn = document.getElementById('run-vault-btn');
+    this.runVaultModal = document.getElementById('run-vault-modal');
+    this.runVaultCloseBtn = document.getElementById('run-vault-close-btn');
+    this.vaultActiveBanner = document.getElementById('vault-active-banner');
+    this.vaultCurrentPass = document.getElementById('vault-current-pass');
+    this.vaultCurrentStats = document.getElementById('vault-current-stats');
+    this.vaultSaveNowBtn = document.getElementById('vault-save-now-btn');
+    this.vaultCopyCodeBtn = document.getElementById('vault-copy-code-btn');
+    this.vaultNewPassInput = document.getElementById('vault-new-pass-input');
+    this.vaultCreateBtn = document.getElementById('vault-create-btn');
+    this.vaultCreateError = document.getElementById('vault-create-error');
+    this.vaultCreateSuccess = document.getElementById('vault-create-success');
+    this.vaultLoadPassInput = document.getElementById('vault-load-pass-input');
+    this.vaultLoadBtn = document.getElementById('vault-load-btn');
+    this.vaultLoadError = document.getElementById('vault-load-error');
+    this.vaultLoadSuccess = document.getElementById('vault-load-success');
+    this.vaultRunsCount = document.getElementById('vault-runs-count');
+    this.vaultEntriesList = document.getElementById('vault-entries-list');
+    this.vaultDownloadJsonBtn = document.getElementById('vault-download-json-btn');
+    this.vaultCopyAllJsonBtn = document.getElementById('vault-copy-all-json-btn');
+
     // Game State
     this.coins = 20; // Starting bonus for comfort
     this.hasBoughtFirstTurret = false;
@@ -118,7 +142,18 @@ class GameEngine {
     this.renderShop();
     this.selectSlot(0);
     this.updateHUD();
-    this.startWave(1);
+
+    // Initialize Run Vault System & listeners
+    this.initSaveVault();
+    this.initVaultEventListeners();
+
+    // When starting a game: ask player to create a secret password, or load existing run
+    if (this.currentRunPassword) {
+      this.updateRunVaultHUDButton();
+      this.startWave(this.wave);
+    } else {
+      this.openRunVaultModal('create');
+    }
 
     requestAnimationFrame(this.gameLoop.bind(this));
   }
@@ -221,6 +256,7 @@ class GameEngine {
     this.adminWeaponSelect.innerHTML = '';
 
     const categories = [
+      { key: 'admin-secret', label: '👑 SECRET ADMIN WEAPONS' },
       { key: 'gun', label: '🔫 Guns' },
       { key: 'godly-gun', label: '⚡ Godly Guns' },
       { key: 'melee', label: '⚔️ Close Range' },
@@ -231,27 +267,29 @@ class GameEngine {
       const group = document.createElement('optgroup');
       group.label = cat.label;
       for (const [id, wep] of Object.entries(WEAPON_REGISTRY)) {
-        if (wep.category === cat.key) {
-          const opt = document.createElement('option');
-          opt.value = id;
-          opt.textContent = `${wep.icon} ${wep.name} (Max Lv.${wep.maxUpgrades})`;
-          group.appendChild(opt);
+        if (cat.key === 'admin-secret') {
+          if (!wep.adminOnly) continue;
+        } else {
+          if (wep.adminOnly) continue; // Secret admin-only weapons belong only in admin-secret category
+          if (wep.category !== cat.key) continue;
         }
+        const opt = document.createElement('option');
+        opt.value = id;
+        opt.textContent = `${wep.icon} ${wep.name} (Max Lv.${wep.maxUpgrades})`;
+        group.appendChild(opt);
       }
-      this.adminWeaponSelect.appendChild(group);
+      if (group.children.length > 0) {
+        this.adminWeaponSelect.appendChild(group);
+      }
     });
   }
 
   initAdminEventListeners() {
     if (!this.adminBtn) return;
 
-    // Open Admin Button (prompts for password [adminpanel123] if not authenticated)
+    // Open Admin Button: prompts for password every time!
     this.adminBtn.addEventListener('click', () => {
-      if (this.isAdminAuthenticated) {
-        this.openAdminPanel();
-      } else {
-        this.openAdminAuthModal();
-      }
+      this.openAdminAuthModal();
     });
 
     // Submit password button
@@ -268,12 +306,40 @@ class GameEngine {
 
     // Close Auth modal
     this.adminAuthCloseBtn.addEventListener('click', () => {
-      this.adminAuthModal.classList.add('hidden');
+      this.closeAdminAuthModal();
     });
 
-    // Close Admin Panel modal
+    // Close Admin Panel modal (revokes authorization so password is required every time)
     this.adminPanelCloseBtn.addEventListener('click', () => {
-      this.adminPanelModal.classList.add('hidden');
+      this.closeAdminPanel();
+    });
+
+    // Backdrop clicks close and reset auth
+    if (this.adminAuthModal) {
+      this.adminAuthModal.addEventListener('click', (e) => {
+        if (e.target === this.adminAuthModal) {
+          this.closeAdminAuthModal();
+        }
+      });
+    }
+
+    if (this.adminPanelModal) {
+      this.adminPanelModal.addEventListener('click', (e) => {
+        if (e.target === this.adminPanelModal) {
+          this.closeAdminPanel();
+        }
+      });
+    }
+
+    // Escape key closes modals and resets auth
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        if (!this.adminPanelModal.classList.contains('hidden')) {
+          this.closeAdminPanel();
+        } else if (!this.adminAuthModal.classList.contains('hidden')) {
+          this.closeAdminAuthModal();
+        }
+      }
     });
 
     // Quick Coin buttons
@@ -374,7 +440,7 @@ class GameEngine {
     const customLvlInput = document.getElementById('admin-custom-level-input');
     if (setCustomLvlBtn && customLvlInput) {
       setCustomLvlBtn.addEventListener('click', () => {
-        const lvl = Math.max(0, Math.min(1005, parseInt(customLvlInput.value) || 0));
+        const lvl = Math.max(0, Math.min(1000000, parseInt(customLvlInput.value) || 0));
         this.adminSetLevel(lvl);
       });
     }
@@ -416,6 +482,14 @@ class GameEngine {
     if (spawn1x1x1Btn) {
       spawn1x1x1Btn.addEventListener('click', () => {
         this.adminSpawn1x1x1();
+      });
+    }
+
+    // SPAWN WEAK WEAPON DUMMY Button (1 Billion HP, deals 500 HP / 10s, no spawn effects)
+    const spawnDummyBtn = document.getElementById('admin-spawn-dummy-btn');
+    if (spawnDummyBtn) {
+      spawnDummyBtn.addEventListener('click', () => {
+        this.adminSpawnDummy();
       });
     }
 
@@ -508,10 +582,18 @@ class GameEngine {
   }
 
   openAdminAuthModal() {
+    this.isAdminAuthenticated = false;
     this.adminPassInput.value = '';
     this.adminAuthError.classList.add('hidden');
     this.adminAuthModal.classList.remove('hidden');
     setTimeout(() => this.adminPassInput.focus(), 50);
+  }
+
+  closeAdminAuthModal() {
+    this.isAdminAuthenticated = false;
+    this.adminPassInput.value = '';
+    this.adminAuthError.classList.add('hidden');
+    this.adminAuthModal.classList.add('hidden');
   }
 
   verifyAdminPassword() {
@@ -520,8 +602,10 @@ class GameEngine {
       this.isAdminAuthenticated = true;
       this.adminAuthModal.classList.add('hidden');
       this.adminAuthError.classList.add('hidden');
+      this.adminPassInput.value = '';
       this.openAdminPanel();
     } else {
+      this.isAdminAuthenticated = false;
       this.adminAuthError.classList.remove('hidden');
       this.adminPassInput.value = '';
       this.adminPassInput.focus();
@@ -529,9 +613,19 @@ class GameEngine {
   }
 
   openAdminPanel() {
-    if (!this.isAdminAuthenticated) return;
+    if (!this.isAdminAuthenticated) {
+      this.openAdminAuthModal();
+      return;
+    }
     this.adminPanelModal.classList.remove('hidden');
     this.updateAdminPanelSlotView();
+    this.renderSaveVaultList();
+  }
+
+  closeAdminPanel() {
+    this.isAdminAuthenticated = false; // Always revoke auth so password is required every time
+    this.adminPassInput.value = '';
+    this.adminPanelModal.classList.add('hidden');
   }
 
   updateAdminPanelSlotView() {
@@ -545,7 +639,7 @@ class GameEngine {
         const isSecret = slot.level > wep.maxUpgrades;
         if (isSecret) {
           const secretTiers = slot.level - wep.maxUpgrades;
-          this.adminTargetSlotWep.innerHTML = `${wep.icon} ${wep.name} <span class="secret-stars-tag">🌌 Lv.${slot.level} [OVERLOAD +${secretTiers}]</span>`;
+          this.adminTargetSlotWep.innerHTML = `${wep.icon} ${wep.name} <span class="secret-stars-tag">🌌 Lv.${slot.level.toLocaleString()} [OVERLOAD +${secretTiers.toLocaleString()}]</span>`;
         } else {
           const stars = '★'.repeat(slot.level);
           this.adminTargetSlotWep.textContent = `${wep.icon} ${wep.name} (Lv.${slot.level} ${stars})`;
@@ -587,7 +681,7 @@ class GameEngine {
     const slot = this.slots[this.adminTargetSlot];
 
     slot.weapon = weaponId;
-    const maxPossible = wep.maxUpgrades + (window.SECRET_UPGRADE_LIMIT || 1000);
+    const maxPossible = wep.maxUpgrades + (window.SECRET_UPGRADE_LIMIT || 1000000);
     slot.level = Math.min(this.adminSelectedLevel, maxPossible);
     slot.timer = 0;
     slot.subTimer = 0;
@@ -622,7 +716,7 @@ class GameEngine {
     const slot = this.slots[this.adminTargetSlot];
     if (slot && slot.weapon) {
       const wep = WEAPON_REGISTRY[slot.weapon];
-      const maxPossible = wep.maxUpgrades + (window.SECRET_UPGRADE_LIMIT || 1000);
+      const maxPossible = wep.maxUpgrades + (window.SECRET_UPGRADE_LIMIT || 1000000);
       slot.level = Math.min(lvl, maxPossible);
       window.soundManager.playUpgrade();
       this.updateHUD();
@@ -653,7 +747,7 @@ class GameEngine {
     const slot = this.slots[this.adminTargetSlot];
     if (slot && slot.weapon) {
       const wep = WEAPON_REGISTRY[slot.weapon];
-      const maxPossible = wep.maxUpgrades + (window.SECRET_UPGRADE_LIMIT || 1000);
+      const maxPossible = wep.maxUpgrades + (window.SECRET_UPGRADE_LIMIT || 1000000);
       slot.level = maxPossible;
       this.adminSelectedLevel = slot.level;
       window.soundManager.playUpgrade();
@@ -664,7 +758,7 @@ class GameEngine {
       const coords = this.getSlotCoords(this.adminTargetSlot);
       this.createExplosionParticles(coords.x + 30, coords.y, '#00f3ff', 35);
       this.createExplosionParticles(coords.x + 30, coords.y, '#ff007f', 35);
-      this.addDamageText(coords.x + 30, coords.y - 20, `🌌 OVERLOADED TO LV.${slot.level}!`, '#ff007f');
+      this.addDamageText(coords.x + 30, coords.y - 20, `🌌 OVERLOADED TO LV.${slot.level.toLocaleString()}!`, '#ff007f');
     }
   }
 
@@ -696,7 +790,8 @@ class GameEngine {
       const slot = this.slots[i];
       if (slot.weapon) {
         const wep = WEAPON_REGISTRY[slot.weapon];
-        slot.level = wep.maxUpgrades + (window.SECRET_UPGRADE_LIMIT || 1000);
+        const maxPossible = wep.maxUpgrades + (window.SECRET_UPGRADE_LIMIT || 1000000);
+        slot.level = maxPossible;
         upgradedAny = true;
         const coords = this.getSlotCoords(i);
         this.createExplosionParticles(coords.x + 30, coords.y, '#00f3ff', 25);
@@ -709,7 +804,7 @@ class GameEngine {
       this.renderCrateSlotsUI();
       this.updateInspector();
       this.updateAdminPanelSlotView();
-      this.addDamageText(this.towerBaseX + 35, this.groundY - 180, '💥 ALL 5 CRATES OVERLOADED (+1,000)!', '#ff007f');
+      this.addDamageText(this.towerBaseX + 35, this.groundY - 180, '💥 ALL 5 CRATES OVERLOADED (+1,000,000)!', '#ff007f');
     }
   }
 
@@ -728,6 +823,13 @@ class GameEngine {
     this.addDamageText(this.canvas.width - 150, this.groundY - 100, '👾 1x1x1 SPAWNED! (1,000🪙)', '#00f3ff');
   }
 
+  adminSpawnDummy() {
+    // Weak Weapon Dummy: 1 Billion HP, deals 500 health every 10s
+    // Explicitly NO special effects on spawn (no camera shake, no explosion sound, no explosion particles)
+    this.spawnEnemy('weak_weapon_dummy');
+    this.addDamageText(this.canvas.width - 150, this.groundY - 100, '🎯 DUMMY SPAWNED (1B HP)', '#ffaa00');
+  }
+
   adminKillAllEnemies() {
     if (this.enemies.length === 0) return;
     window.soundManager.playExplosion();
@@ -740,6 +842,595 @@ class GameEngine {
     this.enemies = [];
     this.updateHUD();
     this.updateInspector();
+  }
+
+  // ================= RUN VAULT & SECRET PASSWORD SYSTEM ================= //
+
+  initSaveVault() {
+    this.saveVault = {};
+
+    // 1. Load initial vault file runs from window.SAVE_VAULT_FILE (from saves.js)
+    if (window.SAVE_VAULT_FILE && window.SAVE_VAULT_FILE.runs) {
+      Object.assign(this.saveVault, window.SAVE_VAULT_FILE.runs);
+    }
+
+    // 2. Load runs saved in localStorage (persisted across sessions in browser)
+    try {
+      const stored = localStorage.getItem('tds_save_vault');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed && typeof parsed === 'object') {
+          Object.assign(this.saveVault, parsed);
+        }
+      }
+    } catch (e) {
+      console.warn('Could not read localStorage vault:', e);
+    }
+
+    // 3. Check for last active run password in localStorage
+    try {
+      const lastPass = localStorage.getItem('tds_active_run_password');
+      if (lastPass && this.saveVault[lastPass]) {
+        this.currentRunPassword = lastPass;
+        this.applyRunData(this.decodeSaveCode(this.saveVault[lastPass].saveCode), lastPass, false);
+      }
+    } catch (e) {
+      console.warn('Could not read active run password:', e);
+    }
+
+    this.updateRunVaultHUDButton();
+    this.renderSaveVaultList();
+  }
+
+  initVaultEventListeners() {
+    if (this.runVaultBtn) {
+      this.runVaultBtn.addEventListener('click', () => {
+        this.openRunVaultModal();
+      });
+    }
+
+    if (this.runVaultCloseBtn) {
+      this.runVaultCloseBtn.addEventListener('click', () => {
+        this.closeRunVaultModal();
+      });
+    }
+
+    if (this.runVaultModal) {
+      this.runVaultModal.addEventListener('click', (e) => {
+        if (e.target === this.runVaultModal) {
+          this.closeRunVaultModal();
+        }
+      });
+    }
+
+    // Tab buttons
+    const tabBtns = document.querySelectorAll('.vault-tab-btn');
+    tabBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const tabKey = btn.dataset.tab;
+        this.switchVaultTab(tabKey);
+      });
+    });
+
+    // Create New Run button & Enter key
+    if (this.vaultCreateBtn && this.vaultNewPassInput) {
+      this.vaultCreateBtn.addEventListener('click', () => {
+        this.handleCreateRun();
+      });
+      this.vaultNewPassInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          this.handleCreateRun();
+        }
+      });
+    }
+
+    // Load Run button & Enter key
+    if (this.vaultLoadBtn && this.vaultLoadPassInput) {
+      this.vaultLoadBtn.addEventListener('click', () => {
+        this.handleLoadRun();
+      });
+      this.vaultLoadPassInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          this.handleLoadRun();
+        }
+      });
+    }
+
+    // Active run banner buttons
+    if (this.vaultSaveNowBtn) {
+      this.vaultSaveNowBtn.addEventListener('click', () => {
+        this.saveCurrentRun(true);
+      });
+    }
+
+    if (this.vaultCopyCodeBtn) {
+      this.vaultCopyCodeBtn.addEventListener('click', () => {
+        if (this.currentRunPassword && this.saveVault[this.currentRunPassword]) {
+          const code = this.saveVault[this.currentRunPassword].saveCode;
+          navigator.clipboard.writeText(code).then(() => {
+            this.addDamageText(this.towerBaseX + 35, this.groundY - 140, '📋 SAVE CODE COPIED!', '#00f3ff');
+            alert('Save Code copied to clipboard!');
+          });
+        }
+      });
+    }
+
+    // Download saves.json
+    if (this.vaultDownloadJsonBtn) {
+      this.vaultDownloadJsonBtn.addEventListener('click', () => {
+        this.downloadSavesJson();
+      });
+    }
+
+    // Copy All JSON
+    if (this.vaultCopyAllJsonBtn) {
+      this.vaultCopyAllJsonBtn.addEventListener('click', () => {
+        this.copyAllVaultJson();
+      });
+    }
+  }
+
+  openRunVaultModal(defaultTab = null) {
+    if (!this.runVaultModal) return;
+    this.runVaultModal.classList.remove('hidden');
+
+    if (this.vaultCreateError) this.vaultCreateError.classList.add('hidden');
+    if (this.vaultCreateSuccess) this.vaultCreateSuccess.classList.add('hidden');
+    if (this.vaultLoadError) this.vaultLoadError.classList.add('hidden');
+    if (this.vaultLoadSuccess) this.vaultLoadSuccess.classList.add('hidden');
+
+    // Update active banner
+    if (this.currentRunPassword && this.saveVault[this.currentRunPassword]) {
+      this.vaultActiveBanner.classList.remove('hidden');
+      this.vaultCurrentPass.innerText = this.currentRunPassword;
+      this.vaultCurrentStats.innerText = `Wave ${this.wave} • ${this.coins} 🪙 • HP ${this.towerHp}/${this.maxTowerHp}`;
+    } else {
+      this.vaultActiveBanner.classList.add('hidden');
+    }
+
+    if (defaultTab) {
+      this.switchVaultTab(defaultTab);
+    } else if (!this.currentRunPassword) {
+      this.switchVaultTab('create');
+    } else {
+      this.switchVaultTab('load');
+    }
+
+    this.renderSaveVaultList();
+  }
+
+  closeRunVaultModal() {
+    if (!this.runVaultModal) return;
+    this.runVaultModal.classList.add('hidden');
+    // If wave hasn't started yet and not active, start wave
+    if (!this.isWaveActive && this.waveSpawnsRemaining.length === 0 && this.enemies.length === 0 && !this.gameOver) {
+      this.startWave(this.wave || 1);
+    }
+  }
+
+  switchVaultTab(tabKey) {
+    const tabBtns = document.querySelectorAll('.vault-tab-btn');
+    tabBtns.forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.tab === tabKey);
+    });
+
+    const createTab = document.getElementById('vault-tab-create');
+    const loadTab = document.getElementById('vault-tab-load');
+
+    if (createTab) createTab.classList.toggle('hidden', tabKey !== 'create');
+    if (loadTab) loadTab.classList.toggle('hidden', tabKey !== 'load');
+
+    if (tabKey === 'create' && this.vaultNewPassInput) {
+      setTimeout(() => this.vaultNewPassInput.focus(), 60);
+    } else if (tabKey === 'load' && this.vaultLoadPassInput) {
+      setTimeout(() => this.vaultLoadPassInput.focus(), 60);
+    }
+  }
+
+  isPasswordTaken(password) {
+    if (!password) return false;
+    const clean = password.trim().toLowerCase();
+    for (const key of Object.keys(this.saveVault)) {
+      if (key.trim().toLowerCase() === clean) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  handleCreateRun() {
+    const pass = (this.vaultNewPassInput.value || '').trim();
+    if (this.vaultCreateError) this.vaultCreateError.classList.add('hidden');
+    if (this.vaultCreateSuccess) this.vaultCreateSuccess.classList.add('hidden');
+
+    if (!pass || pass.length < 3) {
+      this.showVaultCreateError('⚠️ Password must be at least 3 characters long!');
+      return;
+    }
+
+    if (this.isPasswordTaken(pass)) {
+      this.showVaultCreateError(`⚠️ Secret password "${pass}" has ALREADY been selected! Please choose a unique password that has not been used.`);
+      return;
+    }
+
+    // Success: create unique run
+    this.createNewRun(pass);
+  }
+
+  showVaultCreateError(msg) {
+    if (!this.vaultCreateError) return;
+    this.vaultCreateError.innerText = msg;
+    this.vaultCreateError.classList.remove('hidden');
+    if (this.vaultNewPassInput) this.vaultNewPassInput.focus();
+  }
+
+  createNewRun(password) {
+    this.currentRunPassword = password;
+    this.wave = 1;
+    this.coins = 20;
+    this.towerHp = 500;
+    this.maxTowerHp = 500;
+    this.hasBoughtFirstTurret = false;
+    this.slots = [
+      { id: 0, weapon: null, level: 0, timer: 0, subTimer: 0, angle: 0, isFiring: false },
+      { id: 1, weapon: null, level: 0, timer: 0, subTimer: 0, angle: 0, isFiring: false },
+      { id: 2, weapon: null, level: 0, timer: 0, subTimer: 0, angle: 0, isFiring: false },
+      { id: 3, weapon: null, level: 0, timer: 0, subTimer: 0, angle: 0, isFiring: false },
+      { id: 4, weapon: null, level: 0, timer: 0, subTimer: 0, angle: 0, isFiring: false }
+    ];
+
+    // Generate code and save
+    const saveCode = this.generateSaveCode();
+    const runMeta = {
+      password: password,
+      wave: this.wave,
+      coins: this.coins,
+      towerHp: this.towerHp,
+      maxTowerHp: this.maxTowerHp,
+      hasBoughtFirstTurret: this.hasBoughtFirstTurret,
+      autoAdvanceWave: this.autoWave,
+      slots: this.slots.map(s => ({ id: s.id, weapon: s.weapon, level: s.level })),
+      saveCode: saveCode,
+      createdAt: new Date().toISOString(),
+      lastSaved: new Date().toISOString()
+    };
+
+    this.saveVault[password] = runMeta;
+    this.persistVault();
+    try {
+      localStorage.setItem('tds_active_run_password', password);
+    } catch (e) {}
+
+    this.updateRunVaultHUDButton();
+    this.renderSaveVaultList();
+    this.updateHUD();
+    this.renderCrateSlotsUI();
+    this.selectSlot(0);
+
+    if (this.vaultCreateSuccess) {
+      this.vaultCreateSuccess.innerText = `✅ Secret password "${password}" registered! Your new run is ready!`;
+      this.vaultCreateSuccess.classList.remove('hidden');
+    }
+
+    if (this.vaultNewPassInput) this.vaultNewPassInput.value = '';
+
+    setTimeout(() => {
+      this.closeRunVaultModal();
+      this.addDamageText(this.towerBaseX + 35, this.groundY - 140, `🚀 RUN STARTED: ${password}`, '#39ff14');
+      window.soundManager.playUpgrade();
+      this.startWave(1);
+    }, 600);
+  }
+
+  handleLoadRun() {
+    const pass = (this.vaultLoadPassInput.value || '').trim();
+    if (this.vaultLoadError) this.vaultLoadError.classList.add('hidden');
+    if (this.vaultLoadSuccess) this.vaultLoadSuccess.classList.add('hidden');
+
+    if (!pass) {
+      this.showVaultLoadError('⚠️ Please enter your secret password!');
+      return;
+    }
+
+    // Match case-insensitively
+    let matchedKey = null;
+    for (const key of Object.keys(this.saveVault)) {
+      if (key.trim().toLowerCase() === pass.toLowerCase()) {
+        matchedKey = key;
+        break;
+      }
+    }
+
+    if (!matchedKey) {
+      this.showVaultLoadError(`⚠️ Secret password "${pass}" not found in the save vault!`);
+      return;
+    }
+
+    this.loadRunByPassword(matchedKey);
+  }
+
+  showVaultLoadError(msg) {
+    if (!this.vaultLoadError) return;
+    this.vaultLoadError.innerText = msg;
+    this.vaultLoadError.classList.remove('hidden');
+    if (this.vaultLoadPassInput) this.vaultLoadPassInput.focus();
+  }
+
+  loadRunByPassword(password) {
+    const entry = this.saveVault[password];
+    if (!entry || !entry.saveCode) {
+      this.showVaultLoadError('⚠️ Error: corrupted save entry in vault!');
+      return;
+    }
+
+    const decoded = this.decodeSaveCode(entry.saveCode);
+    if (!decoded) {
+      this.showVaultLoadError('⚠️ Error: unable to decode save code!');
+      return;
+    }
+
+    this.applyRunData(decoded, password, true);
+
+    try {
+      localStorage.setItem('tds_active_run_password', password);
+    } catch (e) {}
+
+    this.updateRunVaultHUDButton();
+    this.renderSaveVaultList();
+
+    if (this.vaultLoadSuccess) {
+      this.vaultLoadSuccess.innerText = `✅ Loaded run "${password}" (Wave ${this.wave}, ${this.coins} 🪙)! Resuming run...`;
+      this.vaultLoadSuccess.classList.remove('hidden');
+    }
+
+    if (this.vaultLoadPassInput) this.vaultLoadPassInput.value = '';
+
+    setTimeout(() => {
+      this.closeRunVaultModal();
+      this.closeAdminPanel();
+      this.addDamageText(this.towerBaseX + 35, this.groundY - 140, `▶️ RESUMED: ${password}`, '#00f3ff');
+      window.soundManager.playUpgrade();
+      this.startWave(this.wave);
+    }, 600);
+  }
+
+  applyRunData(data, password, shouldResetCombat = false) {
+    if (!data) return;
+    this.currentRunPassword = password || data.password || this.currentRunPassword;
+    this.wave = data.wave || 1;
+    this.coins = typeof data.coins === 'number' ? data.coins : 20;
+    this.towerHp = typeof data.towerHp === 'number' ? data.towerHp : 500;
+    this.maxTowerHp = typeof data.maxTowerHp === 'number' ? data.maxTowerHp : 500;
+    this.hasBoughtFirstTurret = !!data.hasBoughtFirstTurret;
+    if (data.autoAdvanceWave !== undefined) {
+      this.autoWave = !!data.autoAdvanceWave;
+      if (this.autoWaveBtn) {
+        this.autoWaveBtn.innerText = this.autoWave ? '🔁 Auto Wave: ON' : '🔁 Auto Wave: OFF';
+        this.autoWaveBtn.classList.toggle('active', this.autoWave);
+      }
+    }
+
+    // Apply crate slots
+    if (Array.isArray(data.slots)) {
+      for (let i = 0; i < 5; i++) {
+        const savedSlot = data.slots[i] || {};
+        this.slots[i].weapon = savedSlot.weapon || null;
+        this.slots[i].level = typeof savedSlot.level === 'number' ? savedSlot.level : 0;
+        this.slots[i].timer = 0;
+        this.slots[i].subTimer = 0;
+      }
+    }
+
+    if (shouldResetCombat) {
+      this.enemies = [];
+      this.projectiles = [];
+      this.particles = [];
+      this.damageNumbers = [];
+      this.beams = [];
+      this.lightningArcs = [];
+      this.plasmaPools = [];
+      this.isWaveActive = false;
+      this.gameOver = false;
+      if (this.overlayBanner) this.overlayBanner.classList.add('hidden');
+    }
+
+    this.updateHUD();
+    this.renderCrateSlotsUI();
+    this.selectSlot(this.selectedSlotIndex || 0);
+  }
+
+  generateSaveCode() {
+    const runData = {
+      version: 1,
+      password: this.currentRunPassword || 'unnamed',
+      wave: this.wave,
+      coins: this.coins,
+      towerHp: this.towerHp,
+      maxTowerHp: this.maxTowerHp,
+      hasBoughtFirstTurret: this.hasBoughtFirstTurret,
+      autoAdvanceWave: this.autoWave,
+      slots: this.slots.map(s => ({
+        id: s.id,
+        weapon: s.weapon,
+        level: s.level
+      })),
+      savedAt: new Date().toISOString()
+    };
+
+    const jsonStr = JSON.stringify(runData);
+    return 'TDS1_' + btoa(unescape(encodeURIComponent(jsonStr)));
+  }
+
+  decodeSaveCode(code) {
+    try {
+      if (!code || typeof code !== 'string') return null;
+      if (code.startsWith('TDS1_')) {
+        const b64 = code.substring(5);
+        const jsonStr = decodeURIComponent(escape(atob(b64)));
+        return JSON.parse(jsonStr);
+      }
+      return null;
+    } catch (e) {
+      console.error('Failed to decode save code:', e);
+      return null;
+    }
+  }
+
+  saveCurrentRun(manualNotification = false) {
+    if (!this.currentRunPassword) return;
+
+    const saveCode = this.generateSaveCode();
+    const existing = this.saveVault[this.currentRunPassword] || {};
+
+    const updated = {
+      ...existing,
+      password: this.currentRunPassword,
+      wave: this.wave,
+      coins: this.coins,
+      towerHp: this.towerHp,
+      maxTowerHp: this.maxTowerHp,
+      hasBoughtFirstTurret: this.hasBoughtFirstTurret,
+      autoAdvanceWave: this.autoWave,
+      slots: this.slots.map(s => ({ id: s.id, weapon: s.weapon, level: s.level })),
+      saveCode: saveCode,
+      createdAt: existing.createdAt || new Date().toISOString(),
+      lastSaved: new Date().toISOString()
+    };
+
+    this.saveVault[this.currentRunPassword] = updated;
+    this.persistVault();
+    this.renderSaveVaultList();
+
+    if (this.vaultCurrentStats) {
+      this.vaultCurrentStats.innerText = `Wave ${this.wave} • ${this.coins} 🪙 • HP ${this.towerHp}/${this.maxTowerHp}`;
+    }
+
+    if (manualNotification) {
+      window.soundManager.playUpgrade();
+      this.addDamageText(this.towerBaseX + 35, this.groundY - 140, '💾 RUN SAVED!', '#ffd166');
+      alert(`Run "${this.currentRunPassword}" saved successfully!\nSave Code updated.`);
+    }
+  }
+
+  autoSaveCurrentRun() {
+    if (this.currentRunPassword) {
+      this.saveCurrentRun(false);
+    }
+  }
+
+  persistVault() {
+    try {
+      localStorage.setItem('tds_save_vault', JSON.stringify(this.saveVault));
+    } catch (e) {
+      console.warn('Could not persist vault to localStorage:', e);
+    }
+  }
+
+  updateRunVaultHUDButton() {
+    if (!this.runVaultBtn) return;
+    if (this.currentRunPassword) {
+      this.runVaultBtn.innerText = `🔑 RUN: ${this.currentRunPassword}`;
+      this.runVaultBtn.title = `Active Secret Run: ${this.currentRunPassword} (Click to open vault)`;
+    } else {
+      this.runVaultBtn.innerText = '🔑 RUN: NONE';
+      this.runVaultBtn.title = 'No active run. Click to create or enter your secret password.';
+    }
+  }
+
+  renderSaveVaultList() {
+    if (!this.vaultEntriesList) return;
+    this.vaultEntriesList.innerHTML = '';
+
+    const keys = Object.keys(this.saveVault);
+    if (this.vaultRunsCount) {
+      this.vaultRunsCount.innerText = keys.length;
+    }
+
+    if (keys.length === 0) {
+      this.vaultEntriesList.innerHTML = `
+        <div style="text-align: center; color: var(--text-muted); padding: 20px;">
+          No saved runs in vault yet. Create your secret password to start your first run!
+        </div>
+      `;
+      return;
+    }
+
+    for (const key of keys) {
+      const entry = this.saveVault[key];
+      const isCurrent = this.currentRunPassword && this.currentRunPassword.toLowerCase() === key.toLowerCase();
+
+      const card = document.createElement('div');
+      card.className = `vault-entry-card ${isCurrent ? 'is-current' : ''}`;
+
+      card.innerHTML = `
+        <div class="entry-top-row">
+          <div class="entry-pass-title">
+            <span class="entry-key-icon">🔑</span>
+            <span class="entry-password">${entry.password}</span>
+            ${isCurrent ? '<span class="entry-current-badge">CURRENT RUN</span>' : ''}
+          </div>
+          <div class="entry-stats">
+            Wave ${entry.wave || 1} &bull; ${entry.coins || 0} 🪙
+          </div>
+        </div>
+        <div class="entry-code-row">
+          <span class="entry-code-preview" title="${entry.saveCode}">${entry.saveCode}</span>
+          <div class="entry-actions">
+            <button class="vault-mini-btn cyan copy-entry-code-btn" data-code="${entry.saveCode}">📋 Copy</button>
+            <button class="vault-mini-btn gold play-entry-btn" data-pass="${entry.password}">▶️ Play</button>
+          </div>
+        </div>
+      `;
+
+      // Copy button
+      const copyBtn = card.querySelector('.copy-entry-code-btn');
+      copyBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        navigator.clipboard.writeText(entry.saveCode).then(() => {
+          copyBtn.innerText = '✅ Copied!';
+          setTimeout(() => { copyBtn.innerText = '📋 Copy'; }, 1500);
+        });
+      });
+
+      // Play button
+      const playBtn = card.querySelector('.play-entry-btn');
+      playBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.loadRunByPassword(entry.password);
+      });
+
+      this.vaultEntriesList.appendChild(card);
+    }
+  }
+
+  downloadSavesJson() {
+    const payload = {
+      updatedAt: new Date().toISOString(),
+      runs: this.saveVault
+    };
+    const jsonStr = JSON.stringify(payload, null, 2);
+    const blob = new Blob([jsonStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'saves.json';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    this.addDamageText(this.towerBaseX + 35, this.groundY - 140, '📥 DOWNLOADED saves.json', '#ffd166');
+  }
+
+  copyAllVaultJson() {
+    const payload = {
+      updatedAt: new Date().toISOString(),
+      runs: this.saveVault
+    };
+    const jsonStr = JSON.stringify(payload, null, 2);
+    navigator.clipboard.writeText(jsonStr).then(() => {
+      this.addDamageText(this.towerBaseX + 35, this.groundY - 140, '📋 VAULT JSON COPIED!', '#00f3ff');
+      alert('All vault runs & save codes copied to clipboard as JSON!');
+    });
   }
 
   // Calculate current slot coordinates in world
@@ -818,7 +1509,7 @@ class GameEngine {
 
       // Stars or Secret Overload Badge
       if (slot.level > wep.maxUpgrades) {
-        this.inspectStars.innerHTML = `<span class="secret-stars-badge">🌌 SECRET OVERLOAD &bull; Lv. ${slot.level} (+${slot.level - wep.maxUpgrades})</span>`;
+        this.inspectStars.innerHTML = `<span class="secret-stars-badge">🌌 SECRET OVERLOAD &bull; Lv. ${slot.level.toLocaleString()} (+${(slot.level - wep.maxUpgrades).toLocaleString()})</span>`;
       } else {
         let starStr = '';
         for (let s = 0; s < wep.maxUpgrades; s++) {
@@ -829,8 +1520,16 @@ class GameEngine {
 
       // Stats calculation for current level
       const currentStats = this.getWeaponStats(slot);
+      let dmgDisplay = '';
+      if (currentStats.damage >= 1e18) dmgDisplay = (currentStats.damage / 1e18).toFixed(2) + 'Qi';
+      else if (currentStats.damage >= 1e15) dmgDisplay = (currentStats.damage / 1e15).toFixed(2) + 'Qa';
+      else if (currentStats.damage >= 1e12) dmgDisplay = (currentStats.damage / 1e12).toFixed(2) + 'T';
+      else if (currentStats.damage >= 1e9) dmgDisplay = (currentStats.damage / 1e9).toFixed(2) + 'B';
+      else if (currentStats.damage >= 1e6) dmgDisplay = (currentStats.damage / 1e6).toFixed(2) + 'M';
+      else if (currentStats.damage >= 1e4) dmgDisplay = (currentStats.damage / 1e3).toFixed(1) + 'k';
+      else dmgDisplay = currentStats.damage.toFixed(1);
       let statsHtml = `
-        <span>DMG: <b>${currentStats.damage.toFixed(1)}</b></span>
+        <span>DMG: <b>${dmgDisplay}</b></span>
       `;
       if (currentStats.interval) {
         statsHtml += `<span>Rate: <b>${currentStats.interval}s</b></span>`;
@@ -894,6 +1593,9 @@ class GameEngine {
     const selectedSlot = this.slots[this.selectedSlotIndex];
 
     Object.values(WEAPON_REGISTRY).forEach(wep => {
+      // Secret weapons marked adminOnly cannot be bought in regular shop!
+      if (wep.adminOnly) return;
+
       // Filter by category tab
       if (this.activeShopCategory !== 'all') {
         if (this.activeShopCategory === 'gun' && wep.category !== 'gun') return;
@@ -981,6 +1683,7 @@ class GameEngine {
     this.updateHUD();
     this.renderCrateSlotsUI();
     this.updateInspector();
+    this.autoSaveCurrentRun();
   }
 
   upgradeSelectedSlot() {
@@ -1003,6 +1706,7 @@ class GameEngine {
     this.updateHUD();
     this.renderCrateSlotsUI();
     this.updateInspector();
+    this.autoSaveCurrentRun();
   }
 
   sellSelectedSlot() {
@@ -1026,6 +1730,7 @@ class GameEngine {
     this.updateHUD();
     this.renderCrateSlotsUI();
     this.updateInspector();
+    this.autoSaveCurrentRun();
   }
 
   getWeaponStats(slot) {
@@ -1056,10 +1761,14 @@ class GameEngine {
       stats.damage = peakNormal.damage * (1 + extra * 0.35);
     }
 
-    // 2. Fire interval: progressively faster rate (clamped safely at 0.04s)
+    // 2. Fire interval: progressively faster rate (clamped safely at 0.04s, Ban Gun stays strictly 60s)
     if (stats.interval !== undefined) {
-      stats.interval = Math.max(0.04, peakNormal.interval * Math.pow(0.985, extra));
-      stats.interval = Math.round(stats.interval * 1000) / 1000;
+      if (slot.weapon === 'ban_gun') {
+        stats.interval = 60.0; // Strictly once every 60 seconds as specified!
+      } else {
+        stats.interval = Math.max(0.04, peakNormal.interval * Math.pow(0.985, extra));
+        stats.interval = Math.round(stats.interval * 1000) / 1000;
+      }
     }
 
     // 3. Tick interval (for minigun, flamethrower, chainsaw, energy blade, etc.)
@@ -1673,12 +2382,25 @@ class GameEngine {
       attackRange = 250;
       glitchAttackInterval = 4.0;
       glitchAttackTimer = 2.0;
+    } else if (type === 'weak_weapon_dummy' || type === 'dummy') {
+      // Weak Weapon Dummy - 1 Billion HP, deals 500 damage every 10 sec
+      hp = 1000000000;
+      speed = 10;
+      size = 64;
+      coinReward = 10000;
+      color = '#c9935a';
+      name = 'Weak Weapon Dummy';
+      attackDamage = 500;
+      attackInterval = 10.0;
+      attackRange = 0;
     }
 
-    // Apply late-game scaling and blood moon
-    hp = Math.floor(hp * lateScale * bloodMoonMult);
-    attackDamage = Math.floor(attackDamage * lateScale * bloodMoonMult);
-    coinReward = Math.floor(coinReward * lateScale);
+    // Apply late-game scaling and blood moon (except Weak Weapon Dummy to maintain exact 1B HP and 500 damage)
+    if (type !== 'weak_weapon_dummy' && type !== 'dummy') {
+      hp = Math.floor(hp * lateScale * bloodMoonMult);
+      attackDamage = Math.floor(attackDamage * lateScale * bloodMoonMult);
+      coinReward = Math.floor(coinReward * lateScale);
+    }
 
     // Guaranteed 1,000 coins for secret 1x1x1 boss
     if (type === 'boss_1x1x1' || type === '1x1x1') {
@@ -1699,7 +2421,7 @@ class GameEngine {
       attackDamage: attackDamage,
       attackInterval: attackInterval,
       attackRange: attackRange,
-      attackCooldown: 0.5,
+      attackCooldown: (enemyType === 'weak_weapon_dummy' || enemyType === 'dummy') ? 10.0 : 0.5,
       hitFlash: 0,
       // Special properties
       cloakAlpha: cloakAlpha,
@@ -1730,12 +2452,21 @@ class GameEngine {
     const baseDt = Math.min(rawDelta, 0.05);
 
     if (!this.isPaused && !this.gameOver) {
-      if (this.gameSpeed > 2) {
-        // Substep physics simulation for 5x, 10x, 20x, and 100x to ensure bullet collisions & ticks remain perfectly accurate
-        let steps = 2;
-        if (this.gameSpeed === 10) steps = 4;
-        else if (this.gameSpeed === 20) steps = 6;
-        else if (this.gameSpeed === 100) steps = 12;
+      if (this.gameSpeed > 1) {
+        // High-precision physics sub-stepping (5x more sub-ticks) to guarantee bullet collisions,
+        // weapon ticks, and enemy tracking remain 100% accurate at all speeds:
+        // 2x: 5 steps
+        // 5x: 10 steps (was 2)
+        // 10x: 20 steps (was 4)
+        // 20x: 30 steps (was 6)
+        // 100x: 60 steps (was 12)
+        let steps = 5;
+        if (this.gameSpeed === 5) steps = 10;
+        else if (this.gameSpeed === 10) steps = 20;
+        else if (this.gameSpeed === 20) steps = 30;
+        else if (this.gameSpeed === 100) steps = 60;
+        else if (this.gameSpeed > 1) steps = Math.min(100, Math.round(this.gameSpeed * 2.5));
+
         const subDt = (baseDt * this.gameSpeed) / steps;
         for (let s = 0; s < steps; s++) {
           this.update(subDt);
@@ -1788,6 +2519,7 @@ class GameEngine {
         }
         window.soundManager.playUpgrade();
         this.updateHUD();
+        this.autoSaveCurrentRun();
 
         if (this.autoWave) {
           this.autoWaveTimer = 1.2;
@@ -2523,8 +3255,7 @@ class GameEngine {
           slot.subTimer = 0;
           let hitAny = false;
           const meleeMountX = coords.x + this.crateWidth / 2 + 15;
-          const minClearance = stats.spinRadius + 6;
-          const meleeMountY = Math.min(coords.y, this.groundY - minClearance);
+          const meleeMountY = coords.y;
 
           for (let enemy of this.enemies) {
             const dx = enemy.x - meleeMountX;
@@ -2549,9 +3280,7 @@ class GameEngine {
           slot.subTimer = 0;
           let hitAny = false;
           const meleeMountX = coords.x + this.crateWidth / 2 + 18;
-          const visualRadius = Math.min(34, 24 + slot.level * 2);
-          const minClearance = visualRadius + 6;
-          const meleeMountY = Math.min(coords.y, this.groundY - minClearance);
+          const meleeMountY = coords.y;
 
           for (let enemy of this.enemies) {
             const dx = enemy.x - meleeMountX;
@@ -2809,7 +3538,7 @@ class GameEngine {
         slot.subTimer += dt;
         slot.angle = (slot.angle + 3.0 * dt) % (Math.PI * 2);
         const mountX = coords.x + this.crateWidth / 2 + 15;
-        const mountY = Math.min(coords.y, this.groundY - 42);
+        const mountY = coords.y;
 
         // Radiant solar corona particles
         if (Math.random() < 0.6) {
@@ -2866,6 +3595,61 @@ class GameEngine {
               enemy.attackCooldown = Math.max(enemy.attackCooldown, stats.blindDuration);
               this.addDamageText(enemy.x, enemy.y - 25, '☀️ BLIND', '#ffd166');
             }
+          }
+        }
+        break;
+      }
+
+      // 19. BAN GUN: Secret Admin Weapon! Fires once every 60 seconds and one-shots every enemy on screen!
+      case 'ban_gun': {
+        slot.timer += dt;
+        if (slot.timer >= stats.interval) {
+          const targets = this.enemies.filter(e => e.hp > 0);
+          if (targets.length > 0) {
+            slot.timer = 0;
+            this.cameraShake = 0.55;
+            if (window.soundManager && window.soundManager.playExplosion) {
+              window.soundManager.playExplosion();
+            }
+
+            // Big battlefield announcement banner
+            this.addDamageText(this.towerBaseX + this.crateWidth + 120, this.groundY - 140, '🔨 BAN WAVE EXECUTED!', '#ff0055');
+            this.addDamageText(this.towerBaseX + this.crateWidth + 120, this.groundY - 110, '🚫 ACCESS REVOKED 🚫', '#ffd166');
+
+            // Fire lethal ban beams / arcs and obliterate every target on the screen!
+            targets.forEach(enemy => {
+              // Red/crimson lightning arc from muzzle to enemy
+              if (this.createLightningArc) {
+                this.createLightningArc(muzzleX, muzzleY, enemy.x, enemy.y, '#ff0055');
+              }
+
+              // Also create a thick red ban laser beam
+              this.beams.push({
+                x1: muzzleX,
+                y1: muzzleY,
+                x2: enemy.x,
+                y2: enemy.y,
+                width: 7,
+                lifetime: 0.35,
+                maxLifetime: 0.35
+              });
+
+              // Explosive ban blast particles
+              this.createExplosionParticles(enemy.x, enemy.y, '#ff0055', 20);
+              this.createExplosionParticles(enemy.x, enemy.y, '#ffd166', 12);
+
+              // Guaranteed instant one-shot annihilation
+              const banDamage = Math.max(stats.damage || 10000000000, (enemy.maxHp || 1000) * 10, (enemy.hp + (enemy.shieldHp || 0)) * 10);
+              this.damageEnemy(enemy, banDamage, '#ff0055');
+              enemy.hp = 0;
+              if (enemy.shieldHp) enemy.shieldHp = 0;
+
+              // Banned floating text on target
+              this.addDamageText(enemy.x, enemy.y - 25, '🚫 BANNED!', '#ff0055');
+            });
+          } else {
+            // Keep timer primed at 60s when waiting for enemies to spawn
+            slot.timer = stats.interval;
           }
         }
         break;
@@ -3409,17 +4193,8 @@ class GameEngine {
     // so they spin completely free in open air and never hit or overlap the crate body!
     if (slot.weapon === 'chainsaw' || slot.weapon === 'energy_blade' || slot.weapon === 'void_rift' || slot.weapon === 'graviton_hammer' || slot.weapon === 'solar_core') {
       const mountX = x + this.crateWidth / 2 + 18;
-      // Ensure the weapon center is elevated high enough above groundY so it NEVER clips the ground!
-      let radius = 24;
-      if (slot.weapon === 'energy_blade') {
-        radius = Math.min(32, 22 + slot.level * 2);
-      } else if (slot.weapon === 'chainsaw') {
-        radius = 26;
-      } else {
-        radius = Math.min(40, stats.spinRadius || stats.vortexRadius || stats.auraRadius || 36);
-      }
-      const minClearance = radius + 6;
-      const mountY = Math.min(y, this.groundY - minClearance);
+      // Mount straight out horizontally from the center of the crate so all 5 crates stay uniformly spaced
+      const mountY = y;
       
       // Draw sleek mechanical mounting bracket connecting from crate front to mount
       this.ctx.strokeStyle = '#2b2d42';
@@ -3840,6 +4615,44 @@ class GameEngine {
       this.ctx.lineTo(22, 6);
       this.ctx.closePath();
       this.ctx.fill();
+    } else if (slot.weapon === 'ban_gun') {
+      // Secret Admin Weapon: Obsidian & Crimson Heavy Ban Cannon with digital hologram & countdown
+      this.ctx.shadowColor = '#ff0055';
+      this.ctx.shadowBlur = 14;
+
+      // Heavy obsidian barrel frame
+      this.ctx.fillStyle = '#0f0f14';
+      this.ctx.fillRect(-6, -7, 34, 14);
+
+      // Gold-trimmed power rails
+      this.ctx.fillStyle = '#ffd166';
+      this.ctx.fillRect(-4, -8, 30, 2);
+      this.ctx.fillRect(-4, 6, 30, 2);
+
+      // Crimson plasma core chamber
+      this.ctx.fillStyle = '#ff0055';
+      this.ctx.fillRect(4, -4, 16, 8);
+
+      // Pulsing Ban core emitter / glowing muzzle
+      const pulse = 0.7 + Math.sin(Date.now() / 150) * 0.3;
+      this.ctx.fillStyle = `rgba(255, 255, 255, ${pulse})`;
+      this.ctx.fillRect(26, -5, 6, 10);
+
+      // Floating holographic Ban text & cooldown timer
+      this.ctx.save();
+      this.ctx.shadowBlur = 6;
+      this.ctx.shadowColor = '#ff0055';
+      this.ctx.font = 'bold 9px monospace';
+      this.ctx.textAlign = 'center';
+      const remaining = Math.max(0, Math.ceil(stats.interval - slot.timer));
+      if (remaining <= 0) {
+        this.ctx.fillStyle = '#39ff14';
+        this.ctx.fillText('🔨 READY!', 12, -12);
+      } else {
+        this.ctx.fillStyle = '#ff0055';
+        this.ctx.fillText(`🚫 ${remaining}s`, 12, -12);
+      }
+      this.ctx.restore();
     }
 
     this.ctx.restore();
@@ -4349,6 +5162,64 @@ class GameEngine {
         this.ctx.font = 'bold 9px "Chakra Petch", monospace';
         this.ctx.textAlign = 'center';
         this.ctx.fillText('[ 1x1x1 ]', 0, r * 0.65);
+      } else if (e.type === 'weak_weapon_dummy' || e.type === 'dummy') {
+        // Weak Weapon Dummy - Target / Training Sandbag Dummy
+        // Wooden stand pole
+        this.ctx.fillStyle = '#6b4423';
+        this.ctx.fillRect(-r * 0.18, 0, r * 0.36, r * 1.05);
+
+        // Cross-brace wooden arms
+        this.ctx.fillStyle = '#8b5a2b';
+        this.ctx.fillRect(-r * 1.1, -r * 0.35, r * 2.2, r * 0.35);
+
+        // Reinforced burlap dummy torso
+        this.ctx.fillStyle = e.hitFlash > 0 ? '#ffffff' : '#c9935a';
+        this.ctx.beginPath();
+        this.ctx.ellipse(0, 0, r * 0.75, r * 0.9, 0, 0, Math.PI * 2);
+        this.ctx.fill();
+        this.ctx.strokeStyle = '#5a3818';
+        this.ctx.lineWidth = 2.5;
+        this.ctx.stroke();
+
+        // Bullseye Target on Torso
+        this.ctx.strokeStyle = '#d90429';
+        this.ctx.lineWidth = 3;
+        this.ctx.beginPath();
+        this.ctx.arc(0, 0, r * 0.5, 0, Math.PI * 2);
+        this.ctx.stroke();
+
+        this.ctx.fillStyle = '#ffffff';
+        this.ctx.beginPath();
+        this.ctx.arc(0, 0, r * 0.32, 0, Math.PI * 2);
+        this.ctx.fill();
+
+        this.ctx.fillStyle = '#d90429';
+        this.ctx.beginPath();
+        this.ctx.arc(0, 0, r * 0.16, 0, Math.PI * 2);
+        this.ctx.fill();
+
+        // Dummy head (straw bundle)
+        this.ctx.fillStyle = e.hitFlash > 0 ? '#ffffff' : '#d4a373';
+        this.ctx.beginPath();
+        this.ctx.arc(0, -r * 0.85, r * 0.42, 0, Math.PI * 2);
+        this.ctx.fill();
+        this.ctx.strokeStyle = '#5a3818';
+        this.ctx.lineWidth = 2;
+        this.ctx.stroke();
+
+        // Cross-stitched face "+ +"
+        this.ctx.strokeStyle = '#2b1d0c';
+        this.ctx.lineWidth = 2;
+        this.ctx.beginPath();
+        this.ctx.moveTo(-r * 0.2, -r * 0.95);
+        this.ctx.lineTo(-r * 0.2, -r * 0.75);
+        this.ctx.moveTo(-r * 0.3, -r * 0.85);
+        this.ctx.lineTo(-r * 0.1, -r * 0.85);
+        this.ctx.moveTo(r * 0.2, -r * 0.95);
+        this.ctx.lineTo(r * 0.2, -r * 0.75);
+        this.ctx.moveTo(r * 0.1, -r * 0.85);
+        this.ctx.lineTo(r * 0.3, -r * 0.85);
+        this.ctx.stroke();
       } else {
         // Default Scout crawler
         this.ctx.beginPath();
@@ -4360,7 +5231,7 @@ class GameEngine {
       this.ctx.globalAlpha = renderAlpha;
 
       // Glowing evil eye (skip for types that have custom eyes)
-      if (!['swarm_drone', 'phantom_overlord', 'inferno_wyrm', 'necromancer', 'boss_1x1x1', '1x1x1'].includes(e.type)) {
+      if (!['swarm_drone', 'phantom_overlord', 'inferno_wyrm', 'necromancer', 'boss_1x1x1', '1x1x1', 'weak_weapon_dummy', 'dummy'].includes(e.type)) {
         this.ctx.fillStyle = '#fff';
         this.ctx.beginPath();
         this.ctx.arc(-r * 0.3, -r * 0.2, r * 0.25, 0, Math.PI * 2);
@@ -4374,11 +5245,19 @@ class GameEngine {
       // Reset alpha for UI elements
       this.ctx.globalAlpha = 1.0;
 
-      // Enemy Name & HP text
+      // Enemy Name & HP text (formatted cleanly for billions/millions)
       this.ctx.font = '600 10px Chakra Petch';
       this.ctx.fillStyle = '#e0e1dd';
       this.ctx.textAlign = 'center';
-      this.ctx.fillText(`${e.name} (${Math.ceil(e.hp)})`, 0, -r - 14);
+      let hpDisplay = Math.ceil(e.hp);
+      if (e.hp >= 1e9) {
+        hpDisplay = (e.hp / 1e9).toFixed(2) + 'B';
+      } else if (e.hp >= 1e6) {
+        hpDisplay = (e.hp / 1e6).toFixed(2) + 'M';
+      } else if (e.hp >= 1e4) {
+        hpDisplay = (e.hp / 1e3).toFixed(1) + 'k';
+      }
+      this.ctx.fillText(`${e.name} (${hpDisplay})`, 0, -r - 14);
 
       // Health bar above enemy
       const hpWidth = e.size * 1.4;

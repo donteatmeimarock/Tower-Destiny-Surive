@@ -458,10 +458,35 @@ const WEAPON_REGISTRY = {
       { damage: 13.0, tickInterval: 0.13, auraRadius: 110, flareDamage: 270, flareInterval: 2.3, flareRadius: 200 },
       { damage: 22.0, tickInterval: 0.12, auraRadius: 125, flareDamage: 440, flareInterval: 2.0, flareRadius: 230 }
     ]
+  },
+
+  ban_gun: {
+    id: 'ban_gun',
+    name: 'Ban Gun',
+    category: 'godly-gun',
+    adminOnly: true, // EXCLUSIVE: Can only be equipped in the admin panel!
+    icon: '🔨',
+    basePrice: 999999999,
+    maxUpgrades: 5,
+    description: 'SECRET ADMIN WEAPON: Obliterates & bans every enemy on the screen once every 60 seconds!',
+    baseStats: {
+      damage: 10000000000, // 10 Billion base damage: guaranteed one-shot on all targets
+      interval: 60.0, // 60 seconds cooldown
+      range: 3000,
+      isScreenNuke: true
+    },
+    upgradeCosts: [10000, 50000, 250000, 1000000, 5000000],
+    statUpgrades: [
+      { damage: 25000000000, interval: 60.0 },
+      { damage: 50000000000, interval: 60.0 },
+      { damage: 100000000000, interval: 60.0 },
+      { damage: 250000000000, interval: 60.0 },
+      { damage: 500000000000, interval: 60.0 }
+    ]
   }
 };
 
-const SECRET_UPGRADE_LIMIT = 1000;
+const SECRET_UPGRADE_LIMIT = 1000000;
 
 window.WEAPON_REGISTRY = WEAPON_REGISTRY;
 window.SECRET_UPGRADE_LIMIT = SECRET_UPGRADE_LIMIT;

@@ -28,6 +28,12 @@
           <span class="stat-label">Coins</span>
         </div>
 
+        <div class="stat-badge crystals-badge" title="Boss Crystals: Earn 1 crystal by defeating any boss! Used to awaken max-level weapons.">
+          <span class="crystal-icon">💎</span>
+          <span id="crystal-display" class="stat-value">0</span>
+          <span class="stat-label">Crystals</span>
+        </div>
+
         <div class="stat-badge wave-badge">
           <span class="wave-icon">🌊</span>
           <div>
@@ -101,10 +107,16 @@
                 <!-- Dynamic stat rows -->
               </div>
             </div>
-            <button id="upgrade-weapon-btn" class="upgrade-btn">
-              <span>UPGRADE</span>
-              <span id="upgrade-cost-tag" class="cost-tag">🪙 25</span>
-            </button>
+            <div class="inspector-buttons-col">
+              <button id="upgrade-weapon-btn" class="upgrade-btn">
+                <span>UPGRADE</span>
+                <span id="upgrade-cost-tag" class="cost-tag">🪙 25</span>
+              </button>
+              <button id="awaken-weapon-btn" class="awaken-btn hidden" title="Awaken this weapon with 1 Boss Crystal for mythic powers!">
+                <span>✨ AWAKEN</span>
+                <span id="awaken-cost-tag" class="cost-tag crystal-cost">💎 1</span>
+              </button>
+            </div>
           </div>
 
           <!-- Weapon Shop Arsenal List -->

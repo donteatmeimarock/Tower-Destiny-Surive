@@ -23,7 +23,10 @@ class GameEngine {
     this.currentWeaponInfo = document.getElementById('current-weapon-info');
     this.upgradeWeaponBtn = document.getElementById('upgrade-weapon-btn');
     this.upgradeCostTag = document.getElementById('upgrade-cost-tag');
+    this.awakenWeaponBtn = document.getElementById('awaken-weapon-btn');
+    this.awakenCostTag = document.getElementById('awaken-cost-tag');
     this.sellWeaponBtn = document.getElementById('sell-weapon-btn');
+    this.crystalDisplay = document.getElementById('crystal-display');
     this.overlayBanner = document.getElementById('overlay-banner');
     this.overlayTitle = document.getElementById('overlay-title');
     this.overlaySub = document.getElementById('overlay-sub');
@@ -79,6 +82,7 @@ class GameEngine {
 
     // Game State
     this.coins = 20; // Starting bonus for comfort
+    this.crystals = 0; // Boss crystals for weapon awakening!
     this.hasBoughtFirstTurret = false;
     this.wave = 1;
     this.isWaveActive = false;
@@ -99,11 +103,11 @@ class GameEngine {
 
     // Slot array for the 5 crates (index 0 is bottom crate, 4 is top crate)
     this.slots = [
-      { id: 0, weapon: null, level: 0, timer: 0, subTimer: 0, angle: 0, isFiring: false },
-      { id: 1, weapon: null, level: 0, timer: 0, subTimer: 0, angle: 0, isFiring: false },
-      { id: 2, weapon: null, level: 0, timer: 0, subTimer: 0, angle: 0, isFiring: false },
-      { id: 3, weapon: null, level: 0, timer: 0, subTimer: 0, angle: 0, isFiring: false },
-      { id: 4, weapon: null, level: 0, timer: 0, subTimer: 0, angle: 0, isFiring: false }
+      { id: 0, weapon: null, level: 0, timer: 0, subTimer: 0, angle: 0, isFiring: false, awakened: false },
+      { id: 1, weapon: null, level: 0, timer: 0, subTimer: 0, angle: 0, isFiring: false, awakened: false },
+      { id: 2, weapon: null, level: 0, timer: 0, subTimer: 0, angle: 0, isFiring: false, awakened: false },
+      { id: 3, weapon: null, level: 0, timer: 0, subTimer: 0, angle: 0, isFiring: false, awakened: false },
+      { id: 4, weapon: null, level: 0, timer: 0, subTimer: 0, angle: 0, isFiring: false, awakened: false }
     ];
 
     this.selectedSlotIndex = 0;
@@ -117,6 +121,10 @@ class GameEngine {
     this.beams = []; // railgun laser beams
     this.lightningArcs = []; // tesla coil chain lightning arcs
     this.plasmaPools = []; // orbital mortar lingering plasma pools
+    this.quantumScars = []; // railgun singularity lance lingering scars
+    this.ballLightnings = []; // tesla coil ball lightnings
+    this.crescentWaves = []; // energy blade crescent waves
+    this.godsPeaceTimer = 0; // ban gun judgement day peace timer
     this.cameraShake = 0; // camera shake timer
 
     // Custom weapon sprites
@@ -197,6 +205,13 @@ class GameEngine {
     this.upgradeWeaponBtn.addEventListener('click', () => {
       this.upgradeSelectedSlot();
     });
+
+    // Awaken Weapon Button
+    if (this.awakenWeaponBtn) {
+      this.awakenWeaponBtn.addEventListener('click', () => {
+        this.awakenSelectedSlot();
+      });
+    }
 
     // Sell Button
     this.sellWeaponBtn.addEventListener('click', () => {
@@ -1199,6 +1214,7 @@ class GameEngine {
     this.currentRunPassword = password || data.password || this.currentRunPassword;
     this.wave = data.wave || 1;
     this.coins = typeof data.coins === 'number' ? data.coins : 20;
+    this.crystals = typeof data.crystals === 'number' ? data.crystals : 0;
     this.towerHp = typeof data.towerHp === 'number' ? data.towerHp : 500;
     this.maxTowerHp = typeof data.maxTowerHp === 'number' ? data.maxTowerHp : 500;
     this.hasBoughtFirstTurret = !!data.hasBoughtFirstTurret;
@@ -1216,6 +1232,7 @@ class GameEngine {
         const savedSlot = data.slots[i] || {};
         this.slots[i].weapon = savedSlot.weapon || null;
         this.slots[i].level = typeof savedSlot.level === 'number' ? savedSlot.level : 0;
+        this.slots[i].awakened = !!savedSlot.awakened;
         this.slots[i].timer = 0;
         this.slots[i].subTimer = 0;
       }
@@ -1229,6 +1246,10 @@ class GameEngine {
       this.beams = [];
       this.lightningArcs = [];
       this.plasmaPools = [];
+      this.quantumScars = [];
+      this.ballLightnings = [];
+      this.crescentWaves = [];
+      this.godsPeaceTimer = 0;
       this.isWaveActive = false;
       this.gameOver = false;
       if (this.overlayBanner) this.overlayBanner.classList.add('hidden');
@@ -1245,6 +1266,7 @@ class GameEngine {
       password: this.currentRunPassword || 'unnamed',
       wave: this.wave,
       coins: this.coins,
+      crystals: this.crystals || 0,
       towerHp: this.towerHp,
       maxTowerHp: this.maxTowerHp,
       hasBoughtFirstTurret: this.hasBoughtFirstTurret,
@@ -1252,7 +1274,8 @@ class GameEngine {
       slots: this.slots.map(s => ({
         id: s.id,
         weapon: s.weapon,
-        level: s.level
+        level: s.level,
+        awakened: !!s.awakened
       })),
       savedAt: new Date().toISOString()
     };
@@ -1287,11 +1310,12 @@ class GameEngine {
       password: this.currentRunPassword,
       wave: this.wave,
       coins: this.coins,
+      crystals: this.crystals || 0,
       towerHp: this.towerHp,
       maxTowerHp: this.maxTowerHp,
       hasBoughtFirstTurret: this.hasBoughtFirstTurret,
       autoAdvanceWave: this.autoWave,
-      slots: this.slots.map(s => ({ id: s.id, weapon: s.weapon, level: s.level })),
+      slots: this.slots.map(s => ({ id: s.id, weapon: s.weapon, level: s.level, awakened: !!s.awakened })),
       saveCode: saveCode,
       createdAt: existing.createdAt || new Date().toISOString(),
       lastSaved: new Date().toISOString()
@@ -1462,7 +1486,12 @@ class GameEngine {
       
       let stars = '';
       if (slot.weapon) {
-        if (slot.level > wepDef.maxUpgrades) {
+        if (slot.awakened) {
+          stars = `<span class="awakened-stars-tag">✨ AWAKENED</span>`;
+          if (slot.level > wepDef.maxUpgrades) {
+            stars += ` <span class="secret-stars-tag">🌌 (+${slot.level - wepDef.maxUpgrades})</span>`;
+          }
+        } else if (slot.level > wepDef.maxUpgrades) {
           stars = `<span class="secret-stars-tag">🌌 Lv.${slot.level} (+${slot.level - wepDef.maxUpgrades})</span>`;
         } else {
           for (let s = 0; s < wepDef.maxUpgrades; s++) {
@@ -1507,13 +1536,23 @@ class GameEngine {
       this.currentWeaponInfo.classList.remove('hidden');
       this.sellWeaponBtn.classList.remove('hidden');
 
-      // Stars or Secret Overload Badge
-      if (slot.level > wep.maxUpgrades) {
+      // Stars, Awakened Badge, or Secret Overload Badge
+      if (slot.awakened) {
+        const title = wep.awakened ? wep.awakened.title : 'MYTHIC';
+        if (slot.level > wep.maxUpgrades) {
+          this.inspectStars.innerHTML = `<span class="awakened-stars-badge">✨ AWAKENED: ${title}</span> <span class="secret-stars-badge">🌌 (+${(slot.level - wep.maxUpgrades).toLocaleString()})</span>`;
+        } else {
+          this.inspectStars.innerHTML = `<span class="awakened-stars-badge">✨ AWAKENED: ${title}</span>`;
+        }
+      } else if (slot.level > wep.maxUpgrades) {
         this.inspectStars.innerHTML = `<span class="secret-stars-badge">🌌 SECRET OVERLOAD &bull; Lv. ${slot.level.toLocaleString()} (+${(slot.level - wep.maxUpgrades).toLocaleString()})</span>`;
       } else {
         let starStr = '';
         for (let s = 0; s < wep.maxUpgrades; s++) {
           starStr += s < slot.level ? '★ ' : '☆ ';
+        }
+        if (slot.level === wep.maxUpgrades) {
+          starStr += ' [MAX]';
         }
         this.inspectStars.innerText = starStr;
       }
@@ -1573,6 +1612,9 @@ class GameEngine {
       if (currentStats.flareDamage) {
         statsHtml += `<span>Nova: <b>${currentStats.flareDamage}</b></span>`;
       }
+      if (slot.awakened && wep.awakened) {
+        statsHtml += `<div class="awakened-power-desc">✨ <b>${wep.awakened.title}</b>: ${wep.awakened.desc}</div>`;
+      }
       this.inspectStatsGrid.innerHTML = statsHtml;
 
       // Upgrade button status
@@ -1583,6 +1625,16 @@ class GameEngine {
         const cost = wep.upgradeCosts[slot.level];
         this.upgradeCostTag.innerText = `🪙 ${cost}`;
         this.upgradeWeaponBtn.disabled = this.coins < cost;
+      }
+
+      // Awaken Button status
+      if (this.awakenWeaponBtn) {
+        if (slot.level >= wep.maxUpgrades && !slot.awakened) {
+          this.awakenWeaponBtn.classList.remove('hidden');
+          this.awakenWeaponBtn.disabled = (this.crystals || 0) < 1;
+        } else {
+          this.awakenWeaponBtn.classList.add('hidden');
+        }
       }
     }
     this.renderShop(); // Refresh buy button disable states
@@ -1709,6 +1761,40 @@ class GameEngine {
     this.autoSaveCurrentRun();
   }
 
+  awakenSelectedSlot() {
+    const slot = this.slots[this.selectedSlotIndex];
+    if (!slot || !slot.weapon) return;
+    const wep = WEAPON_REGISTRY[slot.weapon];
+    if (!wep) return;
+    if (slot.level < wep.maxUpgrades) return; // Must be at max standard level
+    if (slot.awakened) return; // Already awakened
+    if ((this.crystals || 0) < 1) return; // Costs 1 crystal
+
+    this.crystals -= 1;
+    slot.awakened = true;
+
+    // Celebratory cosmic awakening VFX
+    const coords = this.getSlotCoords(this.selectedSlotIndex);
+    this.createExplosionParticles(coords.x + 35, coords.y, '#00f3ff', 35);
+    this.createExplosionParticles(coords.x + 35, coords.y, '#ff0080', 35);
+    this.createExplosionParticles(coords.x + 35, coords.y, '#ffd166', 35);
+    this.createExplosionParticles(coords.x + 35, coords.y, '#7928ca', 35);
+
+    const title = wep.awakened ? wep.awakened.title : 'AWAKENED';
+    this.addDamageText(coords.x + 35, coords.y - 30, `✨ ${title}!`, '#00f3ff');
+    this.addDamageText(coords.x + 35, coords.y - 10, '💎 WEAPON AWAKENED!', '#ff0080');
+    this.cameraShake = 0.35;
+
+    if (window.soundManager && window.soundManager.playUpgrade) {
+      window.soundManager.playUpgrade();
+    }
+
+    this.updateHUD();
+    this.renderCrateSlotsUI();
+    this.updateInspector();
+    this.autoSaveCurrentRun();
+  }
+
   sellSelectedSlot() {
     const slot = this.slots[this.selectedSlotIndex];
     if (!slot.weapon) return;
@@ -1761,14 +1847,11 @@ class GameEngine {
       stats.damage = peakNormal.damage * (1 + extra * 0.35);
     }
 
-    // 2. Fire interval: progressively faster rate (clamped safely at 0.04s, Ban Gun stays strictly 60s)
+    // 2. Fire interval: progressively faster rate (clamped safely at 0.04s, or 0.1s for screen nukes)
     if (stats.interval !== undefined) {
-      if (slot.weapon === 'ban_gun') {
-        stats.interval = 60.0; // Strictly once every 60 seconds as specified!
-      } else {
-        stats.interval = Math.max(0.04, peakNormal.interval * Math.pow(0.985, extra));
-        stats.interval = Math.round(stats.interval * 1000) / 1000;
-      }
+      const minInterval = slot.weapon === 'ban_gun' ? 0.1 : 0.04;
+      stats.interval = Math.max(minInterval, peakNormal.interval * Math.pow(0.985, extra));
+      stats.interval = Math.round(stats.interval * 1000) / 1000;
     }
 
     // 3. Tick interval (for minigun, flamethrower, chainsaw, energy blade, etc.)
@@ -1830,6 +1913,9 @@ class GameEngine {
 
   updateHUD() {
     this.coinDisplay.innerText = Math.floor(this.coins);
+    if (this.crystalDisplay) {
+      this.crystalDisplay.innerText = this.crystals || 0;
+    }
     this.waveDisplay.innerText = this.wave;
     const hpPercent = Math.max(0, (this.towerHp / this.maxTowerHp) * 100);
     this.towerHpBar.style.width = `${hpPercent}%`;
@@ -2407,9 +2493,12 @@ class GameEngine {
       coinReward = 1000;
     }
 
+    const isBoss = ['boss', 'doom_colossus', 'phantom_overlord', 'inferno_wyrm', 'boss_1x1x1', '1x1x1', 'weak_weapon_dummy', 'dummy'].includes(type) || ['boss', 'doom_colossus', 'phantom_overlord', 'inferno_wyrm', 'boss_1x1x1', '1x1x1', 'weak_weapon_dummy', 'dummy'].includes(enemyType);
+
     this.enemies.push({
       type: enemyType,
       name: name,
+      isBoss: isBoss,
       x: startX,
       y: groundLevel - size / 2,
       hp: hp,
@@ -2572,12 +2661,15 @@ class GameEngine {
         // Move saw forward or return
         if (!p.returning) {
           p.x += p.vx * dt;
+          if (p.vy) p.y += p.vy * dt;
           if (p.x >= p.originX + p.range) {
             p.returning = true;
             p.vx = -p.sawSpeed;
+            if (p.vy) p.vy = -p.vy;
           }
         } else {
           p.x += p.vx * dt;
+          if (p.vy) p.y += p.vy * dt;
           if (p.x <= p.originX) {
             // Returned to crate launcher!
             this.projectiles.splice(i, 1);
@@ -2611,6 +2703,12 @@ class GameEngine {
               this.damageEnemy(e, p.damage, '#ffd166');
               this.createExplosionParticles(e.x, e.y, '#e0e1dd', 4);
               window.soundManager.playSaw();
+              // Awakened Twin Guillotines: 40% bleed over 3s
+              if (p.isAwakened) {
+                e.bleedTimer = 3.0;
+                e.bleedDps = p.damage * 0.4 / 3;
+                this.addDamageText(e.x, e.y - 15, '🩸BLEED', '#d90429');
+              }
             }
           }
         }
@@ -2666,6 +2764,7 @@ class GameEngine {
             duration: p.poolDuration,
             maxDuration: p.poolDuration,
             dps: p.poolDps,
+            isAwakened: p.isAwakened,
             tickTimer: 0
           });
 
@@ -2673,6 +2772,19 @@ class GameEngine {
           continue;
         }
         continue;
+      }
+
+      // Homing micro-missile steering (Turret Awakened)
+      if (p.isMissile && p.target && p.target.hp > 0) {
+        const targetAngle = Math.atan2(p.target.y - p.y, p.target.x - p.x);
+        const curAngle = Math.atan2(p.vy, p.vx);
+        let diff = targetAngle - curAngle;
+        while (diff < -Math.PI) diff += Math.PI * 2;
+        while (diff > Math.PI) diff -= Math.PI * 2;
+        const newAngle = curAngle + Math.sign(diff) * Math.min(Math.abs(diff), 8.0 * dt);
+        const speed = Math.hypot(p.vx, p.vy);
+        p.vx = Math.cos(newAngle) * speed;
+        p.vy = Math.sin(newAngle) * speed;
       }
 
       p.x += p.vx * dt;
@@ -2693,9 +2805,35 @@ class GameEngine {
         });
       }
 
+      // Piercing bullet handling (Sniper Void Piercer)
+      if (p.piercing) {
+        p.hitEnemies = p.hitEnemies || new Set();
+        for (let e of this.enemies) {
+          if (!p.hitEnemies.has(e) && e.hp > 0) {
+            const dx = p.x - e.x;
+            const dy = p.y - e.y;
+            if (Math.hypot(dx, dy) < e.size / 2 + p.radius) {
+              p.hitEnemies.add(e);
+              let dmg = p.damage;
+              if (e.hp / e.maxHp > 0.6) {
+                dmg *= 2.5;
+                this.addDamageText(e.x, e.y - 20, '⚔EXECUTE!', '#c77dff');
+              }
+              this.damageEnemy(e, dmg, p.color);
+              this.createExplosionParticles(p.x, p.y, p.color, 6);
+            }
+          }
+        }
+        if (p.lifetime <= 0) {
+          this.projectiles.splice(i, 1);
+        }
+        continue;
+      }
+
       // Check collision with enemies
       let hit = false;
       for (let e of this.enemies) {
+        if (e.hp <= 0) continue;
         const dx = p.x - e.x;
         const dy = p.y - e.y;
         const dist = Math.hypot(dx, dy);
@@ -2757,6 +2895,11 @@ class GameEngine {
         for (let enemy of this.enemies) {
           if (Math.abs(enemy.x - pool.x) <= pool.radius + enemy.size / 2) {
             this.damageEnemy(enemy, tickDmg, '#ff7b00');
+            // Hellstorm Barrage armor shred (+50% damage taken)
+            if (pool.isAwakened) {
+              enemy.armorShatterTimer = 1.0;
+              enemy.armorShatterMult = 1.5;
+            }
           }
         }
       }
@@ -2764,6 +2907,76 @@ class GameEngine {
       if (pool.duration <= 0) {
         this.plasmaPools.splice(i, 1);
       }
+    }
+
+    // 4d. Update Quantum Scars (Railgun Singularity Lance)
+    if (this.quantumScars) {
+      for (let i = this.quantumScars.length - 1; i >= 0; i--) {
+        const s = this.quantumScars[i];
+        s.life -= dt;
+        s.tickTimer = (s.tickTimer || 0) + dt;
+        if (s.tickTimer >= 0.2) {
+          s.tickTimer = 0;
+          for (let enemy of this.enemies) {
+            const dist = this.pointToSegmentDistance(enemy.x, enemy.y, s.x1, s.y1, s.x2, s.y2);
+            if (dist <= enemy.size / 2 + 15) {
+              this.damageEnemy(enemy, s.dps * 0.2, '#00f3ff');
+              enemy.slowTimer = 0.5;
+              enemy.slowMult = 0.6;
+            }
+          }
+        }
+        if (s.life <= 0) this.quantumScars.splice(i, 1);
+      }
+    }
+
+    // 4e. Update Ball Lightnings (Tesla Coil Mjolnir Storm)
+    if (this.ballLightnings) {
+      for (let i = this.ballLightnings.length - 1; i >= 0; i--) {
+        const bl = this.ballLightnings[i];
+        bl.life -= dt;
+        bl.zapTimer = (bl.zapTimer || 0) + dt;
+        bl.x += Math.sin(performance.now() / 250 + i) * 15 * dt;
+        bl.y += Math.cos(performance.now() / 300 + i) * 8 * dt;
+        if (bl.zapTimer >= 0.3) {
+          bl.zapTimer = 0;
+          let zapped = 0;
+          for (let enemy of this.enemies) {
+            if (enemy.hp <= 0) continue;
+            if (Math.hypot(enemy.x - bl.x, enemy.y - bl.y) <= 180) {
+              this.damageEnemy(enemy, bl.damage, '#c77dff');
+              this.addLightningArc(bl.x, bl.y, enemy.x, enemy.y, '#00f3ff');
+              zapped++;
+              if (zapped >= 2) break;
+            }
+          }
+        }
+        if (bl.life <= 0) this.ballLightnings.splice(i, 1);
+      }
+    }
+
+    // 4f. Update Crescent Waves (Energy Blade Crescent Eclipse)
+    if (this.crescentWaves) {
+      for (let i = this.crescentWaves.length - 1; i >= 0; i--) {
+        const cw = this.crescentWaves[i];
+        cw.x += cw.vx * dt;
+        cw.life -= dt;
+        for (let enemy of this.enemies) {
+          if (!cw.hitEnemies.has(enemy) && enemy.hp > 0) {
+            if (Math.abs(enemy.x - cw.x) < 25 && Math.abs(enemy.y - cw.y) < cw.width / 2 + enemy.size / 2) {
+              cw.hitEnemies.add(enemy);
+              this.damageEnemy(enemy, cw.damage, '#00f3ff');
+              this.createExplosionParticles(enemy.x, enemy.y, '#00f3ff', 8);
+            }
+          }
+        }
+        if (cw.life <= 0) this.crescentWaves.splice(i, 1);
+      }
+    }
+
+    // Update Peace of the Gods (Ban Gun Judgement Day)
+    if (this.godsPeaceTimer > 0) {
+      this.godsPeaceTimer -= dt;
     }
 
     // 5. Update Enemies
@@ -2936,6 +3149,38 @@ class GameEngine {
         }
       }
 
+      // Peace of the Gods: all enemies frozen in golden time!
+      if (this.godsPeaceTimer > 0) {
+        continue;
+      }
+
+      // Check Stun & Frozen
+      if (enemy.stunTimer > 0) {
+        enemy.stunTimer -= dt;
+        continue;
+      }
+      if (enemy.frozenTimer > 0) {
+        enemy.frozenTimer -= dt;
+        continue;
+      }
+
+      // Burn DoT
+      if (enemy.burnTimer > 0) {
+        enemy.burnTimer -= dt;
+        this.damageEnemy(enemy, (enemy.burnDps || 8) * dt, '#ff4800');
+      }
+
+      // Bleed DoT
+      if (enemy.bleedTimer > 0) {
+        enemy.bleedTimer -= dt;
+        this.damageEnemy(enemy, (enemy.bleedDps || 8) * dt, '#d90429');
+      }
+
+      // Armor shatter timer
+      if (enemy.armorShatterTimer > 0) {
+        enemy.armorShatterTimer -= dt;
+      }
+
       // Move left towards crates or stop within attack range
       const meleeTargetX = this.towerBaseX + this.crateWidth / 2 + enemy.size / 2;
       const targetStopX = enemy.attackRange > 0 ? (this.towerBaseX + enemy.attackRange) : meleeTargetX;
@@ -2997,6 +3242,34 @@ class GameEngine {
       if (enemy.hp <= 0) {
         this.coins += enemy.coinReward;
         window.soundManager.playCoin();
+
+        // Awakened death effects:
+        if (enemy.neurotoxin || enemy.poisonDps > 0) {
+          this.createExplosionParticles(enemy.x, enemy.y, '#70e000', 16);
+          for (let other of this.enemies) {
+            if (other !== enemy && other.hp > 0 && Math.hypot(other.x - enemy.x, other.y - enemy.y) <= 80) {
+              this.damageEnemy(other, 25 + this.wave * 2, '#70e000');
+            }
+          }
+        }
+        if (enemy.frozenTimer > 0) {
+          this.createExplosionParticles(enemy.x, enemy.y, '#00f3ff', 20);
+          for (let s = 0; s < 8; s++) {
+            const sang = (s * Math.PI) / 4;
+            this.fireBullet(enemy.x, enemy.y, sang, 15 + this.wave * 1.5, 300, '#00f3ff', 4);
+          }
+        }
+
+        // Award 1 Boss Crystal whenever any boss is defeated!
+        if (enemy.isBoss) {
+          this.crystals = (this.crystals || 0) + 1;
+          this.addDamageText(enemy.x, enemy.y - 35, '+1 💎 CRYSTAL!', '#00f3ff');
+          this.createExplosionParticles(enemy.x, enemy.y, '#00f3ff', 25);
+          this.createExplosionParticles(enemy.x, enemy.y, '#c77dff', 25);
+          if (window.soundManager && window.soundManager.playUpgrade) {
+            window.soundManager.playUpgrade();
+          }
+        }
 
         if (enemy.type === 'boss_1x1x1' || enemy.type === '1x1x1') {
           // Extra massive celebratory fanfare for defeating 1x1x1 secret boss
@@ -3107,7 +3380,7 @@ class GameEngine {
 
     // Spec handling:
     switch (slot.weapon) {
-      // 1. TURRET: shoots one bullet dealing 5 dmg every 2.0s (Calculates target velocity lead)
+      // 1. TURRET: Hyper-Charge Twin Battery (Dual bullets + seeking micro-missile every 4th volley with 3x dmg and 1s stun)
       case 'turret': {
         slot.timer += dt;
         if (target) {
@@ -3119,34 +3392,66 @@ class GameEngine {
             const fireAngle = this.getPredictiveAimAngle(muzzleX, muzzleY, target, stats.bulletSpeed);
             const spawnX = muzzleX + Math.cos(fireAngle) * 16;
             const spawnY = muzzleY + Math.sin(fireAngle) * 16;
-            this.fireBullet(spawnX, spawnY, fireAngle, stats.damage, stats.bulletSpeed, '#00f3ff', 5);
+
+            if (slot.awakened) {
+              slot.volleyCount = (slot.volleyCount || 0) + 1;
+              // Dual paired parallel bullets
+              this.fireBullet(spawnX, spawnY - 3, fireAngle, stats.damage, stats.bulletSpeed, '#00f3ff', 5);
+              this.fireBullet(spawnX, spawnY + 3, fireAngle, stats.damage, stats.bulletSpeed, '#00f3ff', 5);
+
+              // Every 4th volley fires a seeking micro-missile with 3x damage and 1s stun
+              if (slot.volleyCount % 4 === 0) {
+                this.fireBullet(spawnX, spawnY, fireAngle, stats.damage * 3, stats.bulletSpeed * 0.85, '#ff007f', 7, {
+                  isMissile: true,
+                  target: target
+                });
+                this.addDamageText(spawnX, spawnY - 15, '🚀 SEEKER MISSILE!', '#ff007f');
+              }
+            } else {
+              this.fireBullet(spawnX, spawnY, fireAngle, stats.damage, stats.bulletSpeed, '#00f3ff', 5);
+            }
             window.soundManager.playShoot('turret');
           }
         }
         break;
       }
 
-      // 2. AK-47: shoots a bullet dealing 3 dmg every 0.5s (Calculates target velocity lead)
+      // 2. AK-47: Rampage Overdrive (Stacking fire rate up to +80% + 30% ricochet chance)
       case 'ak47': {
         slot.timer += dt;
         if (target) {
           slot.angle = this.getPredictiveAimAngle(muzzleX, muzzleY, target, stats.bulletSpeed);
+          if (slot.awakened) {
+            slot.rampageStacks = Math.min(8, (slot.rampageStacks || 0) + dt * 1.5);
+          }
+        } else {
+          if (slot.awakened) {
+            slot.rampageStacks = Math.max(0, (slot.rampageStacks || 0) - dt * 2.0);
+          }
         }
-        if (slot.timer >= stats.interval) {
+
+        const effInterval = slot.awakened
+          ? stats.interval / (1 + (slot.rampageStacks || 0) * 0.1)
+          : stats.interval;
+
+        if (slot.timer >= effInterval) {
           if (target) {
             slot.timer = 0;
             const leadAngle = this.getPredictiveAimAngle(muzzleX, muzzleY, target, stats.bulletSpeed);
-            const spread = (Math.random() - 0.5) * 0.05;
+            const spread = (Math.random() - 0.5) * (slot.awakened ? 0.08 : 0.05);
             const spawnX = muzzleX + Math.cos(leadAngle) * 20;
             const spawnY = muzzleY + Math.sin(leadAngle) * 20;
-            this.fireBullet(spawnX, spawnY, leadAngle + spread, stats.damage, stats.bulletSpeed, '#ffb703', 4.5);
+            const bulletColor = slot.awakened ? '#ff4800' : '#ffb703';
+            this.fireBullet(spawnX, spawnY, leadAngle + spread, stats.damage, stats.bulletSpeed, bulletColor, 4.5, {
+              ricochet: slot.awakened ? 0.30 : 0
+            });
             window.soundManager.playShoot('ak47');
           }
         }
         break;
       }
 
-      // 3. MINIGUN: every 0.02s shoots bullet dealing 0.4 dmg (Predictive high-velocity tracking)
+      // 3. MINIGUN: Incendiary Vulcan (24px explosive micro-blasts + 2s ignite burning DoT)
       case 'minigun': {
         slot.timer += dt;
         if (target) {
@@ -3159,14 +3464,19 @@ class GameEngine {
             const spread = (Math.random() - 0.5) * 0.12;
             const spawnX = muzzleX + Math.cos(leadAngle) * 22;
             const spawnY = muzzleY + Math.sin(leadAngle) * 22;
-            this.fireBullet(spawnX, spawnY, leadAngle + spread, stats.damage, stats.bulletSpeed, '#ffaa00', 3);
+            const color = slot.awakened ? '#ff3300' : '#ffaa00';
+            this.fireBullet(spawnX, spawnY, leadAngle + spread, stats.damage, stats.bulletSpeed, color, 3.5, {
+              explosive: slot.awakened,
+              blastRadius: 24,
+              ignite: slot.awakened
+            });
             if (Math.random() < 0.25) window.soundManager.playShoot('minigun');
           }
         }
         break;
       }
 
-      // 4. ENERGY RAILGUN: Charge 10s. Instant hitscan beam (no lead needed, shoots straight through)
+      // 4. ENERGY RAILGUN: Singularity Lance (Instant beam + 3.0s lingering quantum scar with 70% dps and 40% slow)
       case 'railgun': {
         slot.timer += dt;
         if (target) {
@@ -3175,14 +3485,14 @@ class GameEngine {
         if (slot.timer >= stats.interval) {
           if (target) {
             slot.timer = 0;
-            this.fireRailgunBeam(muzzleX, muzzleY, slot.angle, stats.damage, stats.beamWidth, stats.range);
+            this.fireRailgunBeam(muzzleX, muzzleY, slot.angle, stats.damage, stats.beamWidth, stats.range, slot.awakened);
             window.soundManager.playShoot('railgun');
           }
         }
         break;
       }
 
-      // 5. RPG: Wait 5s. Shoot exploding grenade (Calculates lead for rocket velocity)
+      // 5. RPG: Cluster Cataclysm (Main rocket detonation + 6 scattering cluster bomblets in 200px radius for 35% damage)
       case 'rpg': {
         slot.timer += dt;
         if (target) {
@@ -3194,77 +3504,116 @@ class GameEngine {
             const leadAngle = this.getPredictiveAimAngle(muzzleX, muzzleY, target, stats.bulletSpeed);
             const spawnX = muzzleX + Math.cos(leadAngle) * 24;
             const spawnY = muzzleY + Math.sin(leadAngle) * 24;
-            this.fireRPGGrenade(spawnX, spawnY, leadAngle, stats.damage, stats.bulletSpeed, stats.blastRadius);
+            this.fireRPGGrenade(spawnX, spawnY, leadAngle, stats.damage, stats.bulletSpeed, stats.blastRadius, slot.awakened);
             window.soundManager.playShoot('ak47');
           }
         }
         break;
       }
 
-      // 6. FLAMETHROWER: every 7s, blow fire dealing 1 dmg every 0.25s
+      // 6. FLAMETHROWER: Dragon's Cataclysm (360-degree blue hellfire surrounding tower + sticky ground napalm)
       case 'flamethrower': {
         slot.timer += dt;
-        // Check cycle: slot.timer runs from 0 up to cycleInterval + flameDuration
         const isBlowingFire = slot.timer >= stats.cycleInterval;
         if (isBlowingFire) {
           slot.subTimer += dt;
-          // Spawn flame particles
-          const flameAngle = slot.angle + (Math.random() - 0.5) * stats.coneAngle;
-          this.particles.push({
-            x: muzzleX,
-            y: muzzleY,
-            vx: Math.cos(flameAngle) * (180 + Math.random() * 80),
-            vy: Math.sin(flameAngle) * (180 + Math.random() * 80),
-            color: Math.random() > 0.4 ? '#ff5400' : '#ffaa00',
-            radius: 8 + Math.random() * 6,
-            life: 0.45,
-            maxLife: 0.45
-          });
+          if (slot.awakened) {
+            // Dragon's Cataclysm: 360-degree blue hellfire
+            const flameAngle = Math.random() * Math.PI * 2;
+            this.particles.push({
+              x: muzzleX,
+              y: muzzleY,
+              vx: Math.cos(flameAngle) * (180 + Math.random() * 80),
+              vy: Math.sin(flameAngle) * (180 + Math.random() * 80),
+              color: Math.random() > 0.4 ? '#00f3ff' : '#7209b7',
+              radius: 8 + Math.random() * 6,
+              life: 0.45,
+              maxLife: 0.45
+            });
 
-          if (slot.subTimer >= stats.tickInterval) {
-            slot.subTimer = 0;
-            window.soundManager.playFlame();
-            // Damage enemies inside flame cone & range
-            for (let enemy of this.enemies) {
-              const dx = enemy.x - muzzleX;
-              const dy = enemy.y - muzzleY;
-              const dist = Math.hypot(dx, dy);
-              if (dist <= stats.range) {
-                const angleToEnemy = Math.atan2(dy, dx);
-                let diff = Math.abs(angleToEnemy - slot.angle);
-                if (diff > Math.PI) diff = 2 * Math.PI - diff;
-                if (diff <= stats.coneAngle / 2) {
-                  this.damageEnemy(enemy, stats.damage, '#ff5400');
+            if (slot.subTimer >= stats.tickInterval) {
+              slot.subTimer = 0;
+              window.soundManager.playFlame();
+              for (let enemy of this.enemies) {
+                const dist = Math.hypot(enemy.x - muzzleX, enemy.y - muzzleY);
+                if (dist <= stats.range * 1.25) {
+                  this.damageEnemy(enemy, stats.damage * 1.25, '#00f3ff');
+                  enemy.burnTimer = 4.0;
+                  enemy.burnDps = stats.damage * 0.5;
+                }
+              }
+            }
+          } else {
+            const flameAngle = slot.angle + (Math.random() - 0.5) * stats.coneAngle;
+            this.particles.push({
+              x: muzzleX,
+              y: muzzleY,
+              vx: Math.cos(flameAngle) * (180 + Math.random() * 80),
+              vy: Math.sin(flameAngle) * (180 + Math.random() * 80),
+              color: Math.random() > 0.4 ? '#ff5400' : '#ffaa00',
+              radius: 8 + Math.random() * 6,
+              life: 0.45,
+              maxLife: 0.45
+            });
+
+            if (slot.subTimer >= stats.tickInterval) {
+              slot.subTimer = 0;
+              window.soundManager.playFlame();
+              for (let enemy of this.enemies) {
+                const dx = enemy.x - muzzleX;
+                const dy = enemy.y - muzzleY;
+                const dist = Math.hypot(dx, dy);
+                if (dist <= stats.range) {
+                  const angleToEnemy = Math.atan2(dy, dx);
+                  let diff = Math.abs(angleToEnemy - slot.angle);
+                  if (diff > Math.PI) diff = 2 * Math.PI - diff;
+                  if (diff <= stats.coneAngle / 2) {
+                    this.damageEnemy(enemy, stats.damage, '#ff5400');
+                  }
                 }
               }
             }
           }
 
           if (slot.timer >= stats.cycleInterval + stats.flameDuration) {
-            slot.timer = 0; // restart cycle
+            slot.timer = 0;
           }
         }
         break;
       }
 
-      // 7. CHAINSAW: Keeps spinning forever. Every 0.1s touching deals 0.3 dmg
+      // 7. CHAINSAW: Bloodthirsty Ripper (+30% spin radius + siphons 8% damage to heal Tower HP up to 25 HP/s)
       case 'chainsaw': {
         slot.subTimer += dt;
-        slot.angle = ((slot.angle || 0) + (stats.rotSpeed || 10) * dt) % (Math.PI * 2);
+        const spinSpeed = slot.awakened ? (stats.rotSpeed || 10) * 2 : (stats.rotSpeed || 10);
+        slot.angle = ((slot.angle || 0) + spinSpeed * dt) % (Math.PI * 2);
         if (slot.subTimer >= stats.tickInterval) {
           slot.subTimer = 0;
           let hitAny = false;
           const meleeMountX = coords.x + this.crateWidth / 2 + 15;
           const meleeMountY = coords.y;
+          const curRadius = slot.awakened ? stats.spinRadius * 1.3 : stats.spinRadius;
 
           for (let enemy of this.enemies) {
             const dx = enemy.x - meleeMountX;
             const dy = enemy.y - meleeMountY;
             const dist = Math.hypot(dx, dy);
-            if (dist <= stats.spinRadius + enemy.size / 2) {
-              this.damageEnemy(enemy, stats.damage, '#ffaa00');
+            if (dist <= curRadius + enemy.size / 2) {
+              this.damageEnemy(enemy, stats.damage, slot.awakened ? '#ff0054' : '#ffaa00');
               hitAny = true;
-              this.createExplosionParticles(enemy.x, enemy.y, '#e0e1dd', 3);
+              this.createExplosionParticles(enemy.x, enemy.y, slot.awakened ? '#ff0054' : '#e0e1dd', 3);
+
+              // Awakened Bloodthirsty Ripper: 8% life siphon to heal Tower HP
+              if (slot.awakened) {
+                const heal = Math.min(stats.damage * 0.08, 25 * stats.tickInterval);
+                if (this.towerHp < this.maxTowerHp) {
+                  this.towerHp = Math.min(this.maxTowerHp, this.towerHp + heal);
+                  if (Math.random() < 0.2) {
+                    this.addDamageText(this.towerBaseX + this.crateWidth / 2, this.groundY - 100, `+${heal.toFixed(1)} HP`, '#39ff14');
+                  }
+                  this.updateHUD();
+                }
+              }
             }
           }
           if (hitAny) window.soundManager.playChainsaw();
@@ -3272,15 +3621,34 @@ class GameEngine {
         break;
       }
 
-      // 8. ENERGY BLADE: Keeps spinning forever. Every 0.1s touching deals 2 dmg
+      // 8. ENERGY BLADE: Crescent Eclipse (Piercing crescent wave slashes every 0.6s reaching 350px)
       case 'energy_blade': {
         slot.subTimer += dt;
         slot.angle = ((slot.angle || 0) + (stats.rotSpeed || 16) * dt) % (Math.PI * 2);
+        const meleeMountX = coords.x + this.crateWidth / 2 + 18;
+        const meleeMountY = coords.y;
+
+        // Awakened Crescent Eclipse: fires crescent wave every 0.6s
+        if (slot.awakened) {
+          slot.crescentTimer = (slot.crescentTimer || 0) + dt;
+          if (slot.crescentTimer >= 0.6) {
+            slot.crescentTimer = 0;
+            this.crescentWaves.push({
+              x: meleeMountX + 25,
+              y: meleeMountY,
+              vx: 450,
+              width: 90,
+              damage: stats.damage * 1.5,
+              life: 350 / 450,
+              hitEnemies: new Set()
+            });
+            window.soundManager.playEnergyBlade();
+          }
+        }
+
         if (slot.subTimer >= stats.tickInterval) {
           slot.subTimer = 0;
           let hitAny = false;
-          const meleeMountX = coords.x + this.crateWidth / 2 + 18;
-          const meleeMountY = coords.y;
 
           for (let enemy of this.enemies) {
             const dx = enemy.x - meleeMountX;
@@ -3297,7 +3665,7 @@ class GameEngine {
         break;
       }
 
-      // 9. SNIPER RIFLE: high-velocity long-range precision shots
+      // 9. SNIPER RIFLE: Void Piercer (Infinite bullet pierce through all targets + 2.5x executioner damage on >60% HP)
       case 'sniper': {
         slot.timer += dt;
         if (target) {
@@ -3309,15 +3677,18 @@ class GameEngine {
             const leadAngle = this.getPredictiveAimAngle(muzzleX, muzzleY, target, stats.bulletSpeed);
             const spawnX = muzzleX + Math.cos(leadAngle) * 30;
             const spawnY = muzzleY + Math.sin(leadAngle) * 30;
-            this.fireBullet(spawnX, spawnY, leadAngle, stats.damage, stats.bulletSpeed, '#ffd166', 3.5);
-            this.createExplosionParticles(spawnX, spawnY, '#ffb703', 10);
+            const color = slot.awakened ? '#c77dff' : '#ffd166';
+            this.fireBullet(spawnX, spawnY, leadAngle, stats.damage, stats.bulletSpeed, color, slot.awakened ? 5 : 3.5, {
+              piercing: slot.awakened
+            });
+            this.createExplosionParticles(spawnX, spawnY, color, 10);
             window.soundManager.playShoot('sniper');
           }
         }
         break;
       }
 
-      // 10. TESLA COIL: chain lightning bouncing between multiple enemies
+      // 10. TESLA COIL: Mjolnir Storm (10 chain bounces + floating Ball Lightning orb zapping nearby targets for 3.5s)
       case 'tesla_coil': {
         slot.timer += dt;
         if (target) {
@@ -3326,49 +3697,54 @@ class GameEngine {
         if (slot.timer >= stats.interval) {
           if (target) {
             slot.timer = 0;
-            this.fireTeslaLightning(muzzleX, muzzleY, target, stats.damage, stats.chainCount, stats.chainDecay, stats.range);
+            const chains = slot.awakened ? 10 : stats.chainCount;
+            this.fireTeslaLightning(muzzleX, muzzleY, target, stats.damage, chains, stats.chainDecay, stats.range, slot.awakened);
             window.soundManager.playTesla();
           }
         }
         break;
       }
 
-      // 11. BUZZ SAW: Launches returning boomerang saw blade
+      // 11. BUZZ SAW: Twin Guillotines (Launches 2 saws in scissor trajectory + 40% bleed over 3s)
       case 'buzz_saw': {
         slot.timer += dt;
         if (slot.timer >= stats.interval) {
           slot.timer = 0;
-          this.fireBuzzSaw(muzzleX, muzzleY, stats.damage, stats.sawSpeed, stats.range, stats.sawRadius);
+          if (slot.awakened) {
+            // Twin scissor blades
+            this.fireBuzzSaw(muzzleX, muzzleY - 10, stats.damage, stats.sawSpeed, stats.range, stats.sawRadius, -140, true);
+            this.fireBuzzSaw(muzzleX, muzzleY + 10, stats.damage, stats.sawSpeed, stats.range, stats.sawRadius, 140, true);
+          } else {
+            this.fireBuzzSaw(muzzleX, muzzleY, stats.damage, stats.sawSpeed, stats.range, stats.sawRadius);
+          }
           window.soundManager.playSaw();
         }
         break;
       }
 
-      // 12. GRAVITON HAMMER: Periodic shockwave slam that slows enemies
+      // 12. GRAVITON HAMMER: Tectonic Fracture (400px traveling magma fissure with 2.5s stun)
       case 'graviton_hammer': {
         slot.timer += dt;
         const chargeProgress = Math.min(1.0, slot.timer / stats.cycleInterval);
-        // Animate hammer raising back overhead as charge fills
         slot.angle = -0.35 - chargeProgress * 0.95;
 
         if (slot.timer >= stats.cycleInterval) {
           slot.timer = 0;
-          slot.angle = 0.45; // Slam down forward
+          slot.angle = 0.45;
           const slamX = coords.x + this.crateWidth / 2 + 35;
           const slamY = coords.y;
-          this.triggerHammerSlam(slamX, slamY, stats.damage, stats.slamRadius, stats.slowDuration);
+          this.triggerHammerSlam(slamX, slamY, stats.damage, stats.slamRadius, stats.slowDuration, slot.awakened);
         }
         break;
       }
 
-      // 13. VOID RIFT: Persistent gravitational anomaly that pulls and rapidly damages enemies
+      // 13. VOID RIFT: Supermassive Collapse (2x pull force + 4s supermassive 6x damage implosion pulling all enemies)
       case 'void_rift': {
         slot.subTimer += dt;
         slot.angle = (slot.angle + 4.5 * dt) % (Math.PI * 2);
         const mountX = coords.x + this.crateWidth / 2 + 35;
         const mountY = coords.y;
 
-        // Inward spiral vortex particles
         if (Math.random() < 0.65) {
           const pAngle = Math.random() * Math.PI * 2;
           const pDist = stats.vortexRadius * (0.5 + Math.random() * 0.7);
@@ -3384,19 +3760,36 @@ class GameEngine {
           });
         }
 
-        // Pull enemies towards the singularity
+        // Pull enemies (2x pull if awakened)
+        const pullMult = slot.awakened ? 2.0 : 1.0;
         for (let enemy of this.enemies) {
           const dx = mountX - enemy.x;
           const dy = mountY - enemy.y;
           const dist = Math.hypot(dx, dy);
           if (dist <= stats.vortexRadius * 1.5 && dist > 10) {
-            const pull = stats.pullStrength * dt;
+            const pull = stats.pullStrength * pullMult * dt;
             enemy.x += (dx / dist) * pull;
             enemy.y += (dy / dist) * pull * 0.35;
           }
         }
 
-        // Periodic damage ticks
+        // Supermassive Collapse every 4s if awakened
+        if (slot.awakened) {
+          slot.collapseTimer = (slot.collapseTimer || 0) + dt;
+          if (slot.collapseTimer >= 4.0) {
+            slot.collapseTimer = 0;
+            this.cameraShake = 0.35;
+            window.soundManager.playVoid();
+            this.createExplosionParticles(mountX, mountY, '#7209b7', 30);
+            this.createExplosionParticles(mountX, mountY, '#c77dff', 20);
+            this.addDamageText(mountX + 60, mountY - 30, '🌌 SUPERMASSIVE COLLAPSE!', '#c77dff');
+            for (let enemy of this.enemies) {
+              enemy.x = Math.max(this.towerBaseX + this.crateWidth / 2 + 40, enemy.x - 120);
+              this.damageEnemy(enemy, stats.damage * 6, '#7209b7');
+            }
+          }
+        }
+
         if (slot.subTimer >= stats.tickInterval) {
           slot.subTimer = 0;
           let hitAny = false;
@@ -3414,7 +3807,7 @@ class GameEngine {
         break;
       }
 
-      // 14. COMBAT SHOTGUN: 5-pellet close/mid-range spread
+      // 14. COMBAT SHOTGUN: Flak Annihilator (11 pellets + 45px knockback + 3s shattered armor (+25% damage taken))
       case 'shotgun': {
         slot.timer += dt;
         if (target) {
@@ -3424,12 +3817,16 @@ class GameEngine {
           if (target) {
             slot.timer = 0;
             const baseAngle = this.getPredictiveAimAngle(muzzleX, muzzleY, target, stats.bulletSpeed);
-            for (let p = 0; p < stats.pellets; p++) {
-              const spread = (p - (stats.pellets - 1) / 2) * (stats.spreadAngle / (stats.pellets - 1 || 1)) + (Math.random() - 0.5) * 0.05;
+            const numPellets = slot.awakened ? 11 : stats.pellets;
+            const spreadTotal = slot.awakened ? stats.spreadAngle * 1.3 : stats.spreadAngle;
+            for (let p = 0; p < numPellets; p++) {
+              const spread = (p - (numPellets - 1) / 2) * (spreadTotal / (numPellets - 1 || 1)) + (Math.random() - 0.5) * 0.05;
               const fireAngle = baseAngle + spread;
               const spawnX = muzzleX + Math.cos(fireAngle) * 22;
               const spawnY = muzzleY + Math.sin(fireAngle) * 22;
-              this.fireBullet(spawnX, spawnY, fireAngle, stats.damage, stats.bulletSpeed + (Math.random() - 0.5) * 80, '#ff9e00', 3.5);
+              this.fireBullet(spawnX, spawnY, fireAngle, stats.damage, stats.bulletSpeed + (Math.random() - 0.5) * 80, '#ff9e00', 3.5, {
+                isFlak: slot.awakened
+              });
             }
             this.createExplosionParticles(muzzleX + Math.cos(baseAngle) * 22, muzzleY + Math.sin(baseAngle) * 22, '#ff5400', 10);
             window.soundManager.playShoot('shotgun');
@@ -3438,7 +3835,7 @@ class GameEngine {
         break;
       }
 
-      // 15. CRYO CANNON: Freezing frost canister that slows enemies by 65% in an AoE
+      // 15. CRYO CANNON: Absolute Zero (100% freeze immobilization for 1.8s + frost shard death bursts)
       case 'cryo_cannon': {
         slot.timer += dt;
         if (target) {
@@ -3450,17 +3847,17 @@ class GameEngine {
             const fireAngle = this.getPredictiveAimAngle(muzzleX, muzzleY, target, stats.bulletSpeed);
             const spawnX = muzzleX + Math.cos(fireAngle) * 26;
             const spawnY = muzzleY + Math.sin(fireAngle) * 26;
-            this.fireCryoCanister(spawnX, spawnY, fireAngle, stats.damage, stats.bulletSpeed, stats.blastRadius, stats.slowAmount, stats.slowDuration);
+            this.fireCryoCanister(spawnX, spawnY, fireAngle, stats.damage, stats.bulletSpeed, stats.blastRadius, stats.slowAmount, stats.slowDuration, slot.awakened);
             window.soundManager.playCryo();
           }
         }
         break;
       }
 
-      // 16. ORBITAL MORTAR: High-arc artillery targeting densest enemy cluster + lingering plasma pool
+      // 16. ORBITAL MORTAR: Hellstorm Barrage (3-shell salvo + 6.0s pool with 50% armor shred)
       case 'orbital_mortar': {
         slot.timer += dt;
-        slot.angle = -Math.PI / 4; // Angled upward
+        slot.angle = -Math.PI / 4;
         if (slot.timer >= stats.interval) {
           let bestTarget = null;
           let maxDensity = -1;
@@ -3478,17 +3875,28 @@ class GameEngine {
 
           if (bestTarget) {
             slot.timer = 0;
-            this.fireMortarShell(muzzleX, muzzleY, bestTarget.x, this.groundY - 10, stats.damage, stats.blastRadius, stats.poolDuration, stats.poolDps);
+            const targetX = bestTarget.x;
+            const poolDur = slot.awakened ? 6.0 : stats.poolDuration;
+            this.fireMortarShell(muzzleX, muzzleY, targetX, this.groundY - 10, stats.damage, stats.blastRadius, poolDur, stats.poolDps, slot.awakened);
+            
+            // Awakened Hellstorm Barrage: 3-shell salvo
+            if (slot.awakened) {
+              setTimeout(() => {
+                this.fireMortarShell(muzzleX, muzzleY, targetX - 50, this.groundY - 10, stats.damage * 0.8, stats.blastRadius, poolDur, stats.poolDps, true);
+              }, 120);
+              setTimeout(() => {
+                this.fireMortarShell(muzzleX, muzzleY, targetX + 50, this.groundY - 10, stats.damage * 0.8, stats.blastRadius, poolDur, stats.poolDps, true);
+              }, 240);
+            }
             window.soundManager.playMortarLaunch();
           }
         }
         break;
       }
 
-      // 17. TOXIC SPRAYER: Corrosive acid spray with Giant Slayer bonus against enemies > 1000 HP
+      // 17. TOXIC SPRAYER: Plague Biohazard (Lingering neurotoxin cloud (-40% enemy attack) + acid death bursts)
       case 'toxic_sprayer': {
         slot.subTimer += dt;
-        // Spray neon acid particles
         const sprayAngle = slot.angle + (Math.random() - 0.5) * stats.coneAngle;
         this.particles.push({
           x: muzzleX,
@@ -3513,7 +3921,6 @@ class GameEngine {
               let diff = Math.abs(angleToEnemy - slot.angle);
               if (diff > Math.PI) diff = 2 * Math.PI - diff;
               if (diff <= stats.coneAngle / 2) {
-                // Giant slayer perk: boost damage against enemies over 1000 health!
                 let dmg = stats.damage;
                 const isGiant = (enemy.maxHp >= stats.giantThreshold) || (enemy.hp >= stats.giantThreshold);
                 if (isGiant) {
@@ -3525,6 +3932,13 @@ class GameEngine {
                 } else {
                   this.damageEnemy(enemy, dmg, '#38b000');
                 }
+
+                // Awakened Plague Biohazard: neurotoxin debuff (-40% attack)
+                if (slot.awakened && !enemy.neurotoxin) {
+                  enemy.neurotoxin = true;
+                  enemy.attackDamage = Math.max(1, enemy.attackDamage * 0.6);
+                  this.addDamageText(enemy.x, enemy.y - 25, '☣-40% ATK', '#70e000');
+                }
               }
             }
           }
@@ -3532,7 +3946,7 @@ class GameEngine {
         break;
       }
 
-      // 18. SOLAR CORE: Radiant miniature sun with heat aura + periodic solar flare nova
+      // 18. SOLAR CORE: Supernova (1.6s flare cycle + screen-wide blind + 4 solar laser lances)
       case 'solar_core': {
         slot.timer += dt;
         slot.subTimer += dt;
@@ -3540,7 +3954,6 @@ class GameEngine {
         const mountX = coords.x + this.crateWidth / 2 + 15;
         const mountY = coords.y;
 
-        // Radiant solar corona particles
         if (Math.random() < 0.6) {
           const a = Math.random() * Math.PI * 2;
           const d = stats.auraRadius * (0.3 + Math.random() * 0.7);
@@ -3556,7 +3969,6 @@ class GameEngine {
           });
         }
 
-        // Passive heat aura damage
         if (slot.subTimer >= stats.tickInterval) {
           slot.subTimer = 0;
           for (let enemy of this.enemies) {
@@ -3567,13 +3979,12 @@ class GameEngine {
           }
         }
 
-        // Solar flare nova cycle
-        if (slot.timer >= stats.flareInterval) {
+        const flareInterval = slot.awakened ? 1.6 : stats.flareInterval;
+        if (slot.timer >= flareInterval) {
           slot.timer = 0;
           window.soundManager.playSolarFlare();
           this.cameraShake = 0.16;
 
-          // Expanding golden nova ring
           this.particles.push({
             x: mountX,
             y: mountY,
@@ -3586,21 +3997,40 @@ class GameEngine {
             maxLife: 0.4
           });
 
-          // Solar flare damage + sunburst blind
           for (let enemy of this.enemies) {
             const dist = Math.hypot(enemy.x - mountX, enemy.y - mountY);
             if (dist <= stats.flareRadius + enemy.size / 2) {
               this.damageEnemy(enemy, stats.flareDamage, '#ffb703');
-              // Slow attack rate (blind)
-              enemy.attackCooldown = Math.max(enemy.attackCooldown, stats.blindDuration);
+              enemy.attackCooldown = Math.max(enemy.attackCooldown, slot.awakened ? 3.0 : stats.blindDuration);
               this.addDamageText(enemy.x, enemy.y - 25, '☀️ BLIND', '#ffd166');
+            }
+          }
+
+          // Awakened Supernova: 4 concentrated solar laser lances
+          if (slot.awakened) {
+            const sortedEnemies = [...this.enemies].filter(e => e.hp > 0).sort((a, b) => {
+              return Math.hypot(a.x - mountX, a.y - mountY) - Math.hypot(b.x - mountX, b.y - mountY);
+            });
+            for (let i = 0; i < Math.min(4, sortedEnemies.length); i++) {
+              const e = sortedEnemies[i];
+              this.beams.push({
+                x1: mountX,
+                y1: mountY,
+                x2: e.x,
+                y2: e.y,
+                width: 6,
+                lifetime: 0.35,
+                maxLifetime: 0.35
+              });
+              this.damageEnemy(e, stats.flareDamage * 1.5, '#ffd166');
+              this.createExplosionParticles(e.x, e.y, '#ffd166', 10);
             }
           }
         }
         break;
       }
 
-      // 19. BAN GUN: Secret Admin Weapon! Fires once every 60 seconds and one-shots every enemy on screen!
+      // 19. BAN GUN: Judgement Day (Double coin drops from all banned targets + 6s Peace of the Gods bubble freeze)
       case 'ban_gun': {
         slot.timer += dt;
         if (slot.timer >= stats.interval) {
@@ -3612,18 +4042,23 @@ class GameEngine {
               window.soundManager.playExplosion();
             }
 
-            // Big battlefield announcement banner
             this.addDamageText(this.towerBaseX + this.crateWidth + 120, this.groundY - 140, '🔨 BAN WAVE EXECUTED!', '#ff0055');
             this.addDamageText(this.towerBaseX + this.crateWidth + 120, this.groundY - 110, '🚫 ACCESS REVOKED 🚫', '#ffd166');
 
-            // Fire lethal ban beams / arcs and obliterate every target on the screen!
+            if (slot.awakened) {
+              this.godsPeaceTimer = 6.0;
+              this.addDamageText(this.towerBaseX + this.crateWidth + 120, this.groundY - 80, '✨ PEACE OF THE GODS (6s) ✨', '#ffd166');
+            }
+
             targets.forEach(enemy => {
-              // Red/crimson lightning arc from muzzle to enemy
+              if (slot.awakened) {
+                enemy.coinReward *= 2;
+              }
+
               if (this.createLightningArc) {
                 this.createLightningArc(muzzleX, muzzleY, enemy.x, enemy.y, '#ff0055');
               }
 
-              // Also create a thick red ban laser beam
               this.beams.push({
                 x1: muzzleX,
                 y1: muzzleY,
@@ -3634,21 +4069,17 @@ class GameEngine {
                 maxLifetime: 0.35
               });
 
-              // Explosive ban blast particles
               this.createExplosionParticles(enemy.x, enemy.y, '#ff0055', 20);
               this.createExplosionParticles(enemy.x, enemy.y, '#ffd166', 12);
 
-              // Guaranteed instant one-shot annihilation
               const banDamage = Math.max(stats.damage || 10000000000, (enemy.maxHp || 1000) * 10, (enemy.hp + (enemy.shieldHp || 0)) * 10);
               this.damageEnemy(enemy, banDamage, '#ff0055');
               enemy.hp = 0;
               if (enemy.shieldHp) enemy.shieldHp = 0;
 
-              // Banned floating text on target
-              this.addDamageText(enemy.x, enemy.y - 25, '🚫 BANNED!', '#ff0055');
+              this.addDamageText(enemy.x, enemy.y - 25, slot.awakened ? '🚫 PERMA-BANNED (2x🪙)!' : '🚫 BANNED!', '#ff0055');
             });
           } else {
-            // Keep timer primed at 60s when waiting for enemies to spawn
             slot.timer = stats.interval;
           }
         }
@@ -3670,7 +4101,7 @@ class GameEngine {
     return nearest;
   }
 
-  fireBullet(x, y, angle, damage, speed, color, radius) {
+  fireBullet(x, y, angle, damage, speed, color, radius, extras = {}) {
     this.projectiles.push({
       type: 'bullet',
       x,
@@ -3680,11 +4111,12 @@ class GameEngine {
       damage,
       color,
       radius,
-      lifetime: 4.0 // lasts full journey across the entire screen
+      lifetime: 4.0,
+      ...extras
     });
   }
 
-  fireRPGGrenade(x, y, angle, totalDamage, speed, blastRadius) {
+  fireRPGGrenade(x, y, angle, totalDamage, speed, blastRadius, isAwakened = false) {
     this.projectiles.push({
       type: 'rpg',
       x,
@@ -3693,13 +4125,14 @@ class GameEngine {
       vy: Math.sin(angle) * speed,
       totalDamage,
       blastRadius,
+      isAwakened,
       color: '#ff3366',
       radius: 8,
-      lifetime: 4.0 // lasts full journey across the entire screen
+      lifetime: 4.0
     });
   }
 
-  fireRailgunBeam(x, y, angle, damage, width, range) {
+  fireRailgunBeam(x, y, angle, damage, width, range, isAwakened = false) {
     const endX = x + Math.cos(angle) * range;
     const endY = y + Math.sin(angle) * range;
 
@@ -3721,9 +4154,24 @@ class GameEngine {
       lifetime: 0.35,
       maxLifetime: 0.35
     });
+
+    // Awakened Singularity Lance: lingering quantum scar
+    if (isAwakened) {
+      this.quantumScars.push({
+        x1: x,
+        y1: y,
+        x2: endX,
+        y2: endY,
+        width: width * 1.5,
+        dps: damage * 0.7,
+        life: 3.0,
+        maxLife: 3.0,
+        tickTimer: 0
+      });
+    }
   }
 
-  fireBuzzSaw(x, y, damage, speed, range, radius) {
+  fireBuzzSaw(x, y, damage, speed, range, radius, vy = 0, isAwakened = false) {
     this.projectiles.push({
       type: 'saw',
       x: x,
@@ -3731,19 +4179,20 @@ class GameEngine {
       originX: x,
       originY: y,
       vx: speed,
-      vy: 0,
+      vy: vy,
       range: range,
       sawSpeed: speed,
       radius: radius,
       damage: damage,
       returning: false,
+      isAwakened: isAwakened,
       rotAngle: 0,
       lifetime: 8.0,
       hitCooldowns: new Map()
     });
   }
 
-  fireTeslaLightning(originX, originY, firstTarget, baseDamage, maxChains, chainDecay, range) {
+  fireTeslaLightning(originX, originY, firstTarget, baseDamage, maxChains, chainDecay, range, isAwakened = false) {
     let currentTarget = firstTarget;
     let currentDamage = baseDamage;
     const hitEnemies = new Set([firstTarget]);
@@ -3752,6 +4201,18 @@ class GameEngine {
     this.damageEnemy(firstTarget, currentDamage, '#00f3ff');
     this.createExplosionParticles(firstTarget.x, firstTarget.y, '#00f3ff', 8);
     this.addLightningArc(originX, originY, firstTarget.x, firstTarget.y, '#00f3ff');
+
+    // Awakened Mjolnir Storm: spawn Ball Lightning orb at target
+    if (isAwakened && this.ballLightnings) {
+      this.ballLightnings.push({
+        x: firstTarget.x,
+        y: firstTarget.y,
+        damage: baseDamage * 0.8,
+        life: 3.5,
+        maxLife: 3.5,
+        zapTimer: 0
+      });
+    }
 
     // Bounce to next enemies
     let chainsDone = 1;
@@ -3808,7 +4269,7 @@ class GameEngine {
     });
   }
 
-  triggerHammerSlam(slamX, slamY, damage, radius, slowDuration) {
+  triggerHammerSlam(slamX, slamY, damage, radius, slowDuration, isAwakened = false) {
     this.cameraShake = 0.22;
     window.soundManager.playHammer();
 
@@ -3851,9 +4312,26 @@ class GameEngine {
         this.createExplosionParticles(enemy.x, enemy.y, '#c77dff', 6);
       }
     }
+
+    // Awakened Tectonic Fracture: 400px traveling magma fissure
+    if (isAwakened) {
+      for (let fx = 0; fx < 400; fx += 25) {
+        const px = slamX + fx;
+        const py = this.groundY - 10 + (Math.random() - 0.5) * 12;
+        this.createExplosionParticles(px, py, '#ff5400', 6);
+        this.createExplosionParticles(px, py, '#ffd166', 4);
+      }
+      for (let enemy of this.enemies) {
+        if (enemy.hp > 0 && enemy.x >= slamX && enemy.x <= slamX + 400) {
+          this.damageEnemy(enemy, damage * 0.75, '#ff5400');
+          enemy.stunTimer = 2.5;
+          this.addDamageText(enemy.x, enemy.y - 25, '🌋 STUN 2.5s', '#ff5400');
+        }
+      }
+    }
   }
 
-  fireCryoCanister(x, y, angle, damage, speed, blastRadius, slowAmount, slowDuration) {
+  fireCryoCanister(x, y, angle, damage, speed, blastRadius, slowAmount, slowDuration, isAwakened = false) {
     this.projectiles.push({
       type: 'cryo',
       x,
@@ -3864,13 +4342,14 @@ class GameEngine {
       blastRadius,
       slowAmount,
       slowDuration,
+      isAwakened,
       color: '#00f3ff',
       radius: 7,
       lifetime: 4.0
     });
   }
 
-  fireMortarShell(startX, startY, targetX, targetY, damage, blastRadius, poolDuration, poolDps) {
+  fireMortarShell(startX, startY, targetX, targetY, damage, blastRadius, poolDuration, poolDps, isAwakened = false) {
     this.projectiles.push({
       type: 'mortar',
       x: startX,
@@ -3883,6 +4362,7 @@ class GameEngine {
       blastRadius,
       poolDuration,
       poolDps,
+      isAwakened,
       arcTime: 0,
       maxArcTime: 1.1,
       arcHeight: 180,
@@ -3910,13 +4390,20 @@ class GameEngine {
         const d = Math.hypot(enemy.x - p.x, enemy.y - p.y);
         if (d <= p.blastRadius + enemy.size / 2) {
           this.damageEnemy(enemy, p.damage, '#00f3ff');
-          enemy.slowTimer = p.slowDuration;
-          enemy.slowMult = 1 - p.slowAmount;
-          this.addDamageText(enemy.x, enemy.y - 25, '❄ FREEZE', '#00f3ff');
+          if (p.isAwakened) {
+            // Absolute Zero: 100% immobilized
+            enemy.frozenTimer = 1.8;
+            enemy.slowTimer = 1.8;
+            enemy.slowMult = 0;
+            this.addDamageText(enemy.x, enemy.y - 25, '❄ ABSOLUTE ZERO', '#00f3ff');
+          } else {
+            enemy.slowTimer = p.slowDuration;
+            enemy.slowMult = 1 - p.slowAmount;
+            this.addDamageText(enemy.x, enemy.y - 25, '❄ FREEZE', '#00f3ff');
+          }
         }
       }
     } else if (p.type === 'rpg') {
-      // Explode and distribute total 250 damage equally among all hit targets
       window.soundManager.playExplosion();
       this.createExplosionParticles(p.x, p.y, '#ff5400', 35);
       
@@ -3934,14 +4421,84 @@ class GameEngine {
           this.damageEnemy(enemy, damagePerEnemy, '#ff3366');
         }
       }
+
+      // Awakened Cluster Cataclysm: 6 scatter cluster bomblets
+      if (p.isAwakened) {
+        for (let b = 0; b < 6; b++) {
+          const cAngle = (Math.PI * 2 * b) / 6 + (Math.random() - 0.5) * 0.4;
+          const cDist = 45 + Math.random() * 75;
+          const cx = p.x + Math.cos(cAngle) * cDist;
+          const cy = Math.min(this.groundY - 10, p.y + Math.sin(cAngle) * cDist);
+          this.createExplosionParticles(cx, cy, '#ff3366', 15);
+          this.createExplosionParticles(cx, cy, '#ffd166', 10);
+          for (let e of this.enemies) {
+            if (e.hp > 0 && Math.hypot(e.x - cx, e.y - cy) <= 100) {
+              this.damageEnemy(e, p.totalDamage * 0.35, '#ff3366');
+            }
+          }
+        }
+      }
     } else {
-      // Standard bullet
+      // Standard or Awakened Bullet
       this.damageEnemy(targetEnemy, p.damage, p.color);
       this.createExplosionParticles(p.x, p.y, p.color, 4);
+
+      // Micro-missile stun (Turret Awakened)
+      if (p.isMissile) {
+        targetEnemy.stunTimer = 1.0;
+        this.addDamageText(targetEnemy.x, targetEnemy.y - 20, '⚡STUN 1s', '#00f3ff');
+        this.createExplosionParticles(p.x, p.y, '#00f3ff', 12);
+      }
+
+      // Micro-explosions & ignite (Minigun Incendiary Vulcan)
+      if (p.explosive) {
+        this.createExplosionParticles(p.x, p.y, '#ff4800', 8);
+        for (let e of this.enemies) {
+          if (e !== targetEnemy && Math.hypot(e.x - p.x, e.y - p.y) <= (p.blastRadius || 24)) {
+            this.damageEnemy(e, p.damage, '#ff4800');
+            e.burnTimer = 2.0;
+            e.burnDps = p.damage * 0.75;
+          }
+        }
+        targetEnemy.burnTimer = 2.0;
+        targetEnemy.burnDps = p.damage * 0.75;
+      }
+
+      // Flak Annihilator knockback and shatter (Shotgun Awakened)
+      if (p.isFlak) {
+        targetEnemy.x += 45;
+        targetEnemy.armorShatterTimer = 3.0;
+        targetEnemy.armorShatterMult = 1.25;
+        this.addDamageText(targetEnemy.x, targetEnemy.y - 20, '💥SHATTER', '#ff9e00');
+      }
+
+      // Ricochet (AK-47 Rampage Overdrive)
+      if (p.ricochet && Math.random() < p.ricochet) {
+        let nextTarget = null;
+        let minD = 180;
+        for (let e of this.enemies) {
+          if (e !== targetEnemy && e.hp > 0) {
+            const d = Math.hypot(e.x - p.x, e.y - p.y);
+            if (d < minD) {
+              minD = d;
+              nextTarget = e;
+            }
+          }
+        }
+        if (nextTarget) {
+          const rAngle = Math.atan2(nextTarget.y - p.y, nextTarget.x - p.x);
+          this.fireBullet(p.x, p.y, rAngle, p.damage * 0.7, 750, '#ffd166', 3.5);
+          this.addDamageText(p.x, p.y - 10, '↪RICOCHET', '#ffd166');
+        }
+      }
     }
   }
 
   damageEnemy(enemy, amount, color) {
+    // Armor shatter bonus damage from awakened shotgun or mortar pool
+    if (enemy.armorShatterTimer > 0) {
+      amount *= (enemy.armorShatterMult || 1.25);
+    }
     // Shield Bearer: Shield absorbs damage first
     if (enemy.shieldHp > 0) {
       const absorbed = Math.min(enemy.shieldHp, amount);
@@ -4008,6 +4565,10 @@ class GameEngine {
     this.beams = [];
     this.lightningArcs = [];
     this.plasmaPools = [];
+    this.quantumScars = [];
+    this.ballLightnings = [];
+    this.crescentWaves = [];
+    this.godsPeaceTimer = 0;
     this.cameraShake = 0;
 
     this.slots.forEach(s => {
@@ -4043,9 +4604,14 @@ class GameEngine {
     // 1b. Draw Lingering Plasma Pools (Orbital Mortar)
     this.drawPlasmaPools();
 
+    // 1c. Draw Lingering Quantum Scars (Railgun Singularity Lance)
+    this.drawQuantumScars();
+
     // 2. Draw Beams & Lightning
     this.drawRailgunBeams();
     this.drawLightningArcs();
+    this.drawBallLightnings();
+    this.drawCrescentWaves();
 
     // 3. Draw The 5 Crates Stack and Character
     this.drawTowerAndCharacter();
@@ -4061,6 +4627,11 @@ class GameEngine {
 
     // 7. Draw Floating Numbers
     this.drawDamageNumbers();
+
+    // 8. Draw Peace of the Gods Holy Shimmer (Ban Gun Awakened)
+    if (this.godsPeaceTimer > 0) {
+      this.drawGodsPeace();
+    }
 
     this.ctx.restore();
   }
@@ -4123,6 +4694,103 @@ class GameEngine {
 
       this.ctx.restore();
     }
+  }
+
+  drawQuantumScars() {
+    if (!this.quantumScars) return;
+    for (let s of this.quantumScars) {
+      const alpha = Math.min(1.0, s.life / 0.5);
+      this.ctx.save();
+      this.ctx.shadowColor = '#00f3ff';
+      this.ctx.shadowBlur = 24;
+      this.ctx.strokeStyle = `rgba(0, 243, 255, ${0.45 * alpha})`;
+      this.ctx.lineWidth = s.width || 12;
+      this.ctx.beginPath();
+      this.ctx.moveTo(s.x1, s.y1);
+      this.ctx.lineTo(s.x2, s.y2);
+      this.ctx.stroke();
+
+      // Pulsing violet spatial tear
+      this.ctx.strokeStyle = `rgba(157, 78, 221, ${0.7 * alpha})`;
+      this.ctx.lineWidth = 6;
+      this.ctx.stroke();
+
+      // Shimmering white quantum fissure
+      this.ctx.strokeStyle = `rgba(255, 255, 255, ${0.9 * alpha})`;
+      this.ctx.lineWidth = 2.5;
+      this.ctx.stroke();
+      this.ctx.restore();
+    }
+  }
+
+  drawBallLightnings() {
+    if (!this.ballLightnings) return;
+    for (let bl of this.ballLightnings) {
+      this.ctx.save();
+      this.ctx.shadowColor = '#c77dff';
+      this.ctx.shadowBlur = 20;
+      const grad = this.ctx.createRadialGradient(bl.x, bl.y, 2, bl.x, bl.y, 16);
+      grad.addColorStop(0, '#ffffff');
+      grad.addColorStop(0.35, '#c77dff');
+      grad.addColorStop(0.7, '#7209b7');
+      grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      this.ctx.fillStyle = grad;
+      this.ctx.beginPath();
+      this.ctx.arc(bl.x, bl.y, 16, 0, Math.PI * 2);
+      this.ctx.fill();
+
+      // Orbiting micro-sparks
+      for (let p = 0; p < 3; p++) {
+        const ang = performance.now() / 150 + (p * Math.PI * 2 / 3);
+        const px = bl.x + Math.cos(ang) * 12;
+        const py = bl.y + Math.sin(ang) * 12;
+        this.ctx.fillStyle = '#00f3ff';
+        this.ctx.beginPath();
+        this.ctx.arc(px, py, 2, 0, Math.PI * 2);
+        this.ctx.fill();
+      }
+      this.ctx.restore();
+    }
+  }
+
+  drawCrescentWaves() {
+    if (!this.crescentWaves) return;
+    for (let cw of this.crescentWaves) {
+      this.ctx.save();
+      this.ctx.shadowColor = '#00f3ff';
+      this.ctx.shadowBlur = 18;
+      this.ctx.strokeStyle = '#00f3ff';
+      this.ctx.lineWidth = 5;
+      this.ctx.beginPath();
+      this.ctx.arc(cw.x - 25, cw.y, cw.width / 2, -Math.PI / 3, Math.PI / 3);
+      this.ctx.stroke();
+
+      this.ctx.strokeStyle = '#ffffff';
+      this.ctx.lineWidth = 2;
+      this.ctx.stroke();
+      this.ctx.restore();
+    }
+  }
+
+  drawGodsPeace() {
+    const alpha = Math.min(0.28, (this.godsPeaceTimer / 6.0) * 0.28);
+    this.ctx.save();
+    this.ctx.fillStyle = `rgba(255, 215, 0, ${alpha})`;
+    this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+
+    // Divine border vignette
+    this.ctx.strokeStyle = `rgba(255, 215, 0, ${alpha * 2.5})`;
+    this.ctx.lineWidth = 8;
+    this.ctx.strokeRect(0, 0, this.canvas.width, this.canvas.height);
+
+    // Divine announcement
+    this.ctx.font = '700 16px Chakra Petch';
+    this.ctx.fillStyle = '#ffd166';
+    this.ctx.textAlign = 'center';
+    this.ctx.shadowColor = '#ffd166';
+    this.ctx.shadowBlur = 12;
+    this.ctx.fillText(`✨ PEACE OF THE GODS (${this.godsPeaceTimer.toFixed(1)}s) ✨`, this.canvas.width / 2, 60);
+    this.ctx.restore();
   }
 
   drawTowerAndCharacter() {
@@ -4222,6 +4890,36 @@ class GameEngine {
     } else {
       // Guns and launchers are mounted on the front edge of the crate
       this.ctx.translate(x + this.crateWidth / 2 - 2, y);
+    }
+
+    // Awakened Visual Aura: Iridescent glowing halo & orbiting celestial sparks
+    if (slot.awakened) {
+      this.ctx.save();
+      const time = performance.now() / 550;
+      const auraGrad = this.ctx.createRadialGradient(0, 0, 4, 0, 0, 36);
+      auraGrad.addColorStop(0, 'rgba(0, 243, 255, 0.45)');
+      auraGrad.addColorStop(0.45, 'rgba(114, 9, 183, 0.35)');
+      auraGrad.addColorStop(0.85, 'rgba(255, 0, 110, 0.22)');
+      auraGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      this.ctx.fillStyle = auraGrad;
+      this.ctx.beginPath();
+      this.ctx.arc(0, 0, 36, 0, Math.PI * 2);
+      this.ctx.fill();
+
+      // Orbiting celestial star sparks
+      for (let s = 0; s < 4; s++) {
+        const sAng = time * 2.5 + (s * Math.PI / 2);
+        const sDist = 18 + Math.sin(time * 3 + s) * 5;
+        const sx = Math.cos(sAng) * sDist;
+        const sy = Math.sin(sAng) * sDist;
+        this.ctx.fillStyle = s % 2 === 0 ? '#00f3ff' : '#ff007f';
+        this.ctx.shadowColor = '#00f3ff';
+        this.ctx.shadowBlur = 8;
+        this.ctx.beginPath();
+        this.ctx.arc(sx, sy, 2.5, 0, Math.PI * 2);
+        this.ctx.fill();
+      }
+      this.ctx.restore();
     }
 
     // Close range spinning & field weapons
@@ -4644,13 +5342,16 @@ class GameEngine {
       this.ctx.shadowColor = '#ff0055';
       this.ctx.font = 'bold 9px monospace';
       this.ctx.textAlign = 'center';
-      const remaining = Math.max(0, Math.ceil(stats.interval - slot.timer));
-      if (remaining <= 0) {
+      const remaining = Math.max(0, stats.interval - slot.timer);
+      if (remaining <= 0.05) {
         this.ctx.fillStyle = '#39ff14';
         this.ctx.fillText('🔨 READY!', 12, -12);
+      } else if (stats.interval < 1.0) {
+        this.ctx.fillStyle = '#ff0055';
+        this.ctx.fillText(`🚫 ${remaining.toFixed(1)}s`, 12, -12);
       } else {
         this.ctx.fillStyle = '#ff0055';
-        this.ctx.fillText(`🚫 ${remaining}s`, 12, -12);
+        this.ctx.fillText(`🚫 ${Math.ceil(remaining)}s`, 12, -12);
       }
       this.ctx.restore();
     }

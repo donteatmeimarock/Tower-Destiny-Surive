@@ -46,7 +46,11 @@ const WEAPON_REGISTRY = {
       { damage: 16, interval: 1.4 },
       { damage: 22, interval: 1.2 },
       { damage: 30, interval: 1.0 }
-    ]
+    ],
+    awakened: {
+      title: 'Hyperion Twin-Autocannon',
+      desc: 'Fires paired dual plasma shots + homing micro-missiles every 4th volley dealing 3x DMG & stun.'
+    }
   },
 
   ak47: {
@@ -70,7 +74,11 @@ const WEAPON_REGISTRY = {
       { damage: 9.5, interval: 0.35 },
       { damage: 13.5, interval: 0.30 },
       { damage: 19.0, interval: 0.25 }
-    ]
+    ],
+    awakened: {
+      title: 'Storm Carbine: Overclock',
+      desc: 'Ramping fire rate up to +80% on consecutive hits + 30% chance for bullets to ricochet.'
+    }
   },
 
   minigun: {
@@ -94,7 +102,11 @@ const WEAPON_REGISTRY = {
       { damage: 1.5, interval: 0.016 },
       { damage: 2.2, interval: 0.015 },
       { damage: 3.2, interval: 0.014 }
-    ]
+    ],
+    awakened: {
+      title: 'Vulkan Deathstorm',
+      desc: 'Fires HE micro-rounds with 24px AoE blast + ignites enemies for burning DPS.'
+    }
   },
 
   sniper: {
@@ -118,7 +130,11 @@ const WEAPON_REGISTRY = {
       { damage: 60, interval: 2.6 },
       { damage: 85, interval: 2.3 },
       { damage: 120, interval: 2.0 }
-    ]
+    ],
+    awakened: {
+      title: 'Orbital Rail-Hawkeye',
+      desc: 'Infinite screen-wide bullet penetration + +150% executioner damage on healthy targets.'
+    }
   },
 
   railgun: {
@@ -144,7 +160,11 @@ const WEAPON_REGISTRY = {
       { damage: 2600, interval: 7.2 },
       { damage: 3700, interval: 6.5 },
       { damage: 5200, interval: 5.5 }
-    ]
+    ],
+    awakened: {
+      title: 'Antimatter Hyper-Lance',
+      desc: 'Leaves a 3s lingering quantum scar rift dealing 70% DPS and slowing passing enemies.'
+    }
   },
 
   rpg: {
@@ -169,7 +189,11 @@ const WEAPON_REGISTRY = {
       { damage: 780, interval: 3.8, blastRadius: 175 },
       { damage: 1100, interval: 3.4, blastRadius: 190 },
       { damage: 1600, interval: 3.0, blastRadius: 210 }
-    ]
+    ],
+    awakened: {
+      title: 'MIRV Cluster Titan',
+      desc: 'Rocket detonation splits into 6 secondary cluster bomblets in a wide 200px carpet bomb.'
+    }
   },
 
   tesla_coil: {
@@ -194,7 +218,11 @@ const WEAPON_REGISTRY = {
       { damage: 115, interval: 3.1, chainCount: 4, chainDecay: 0.65 },
       { damage: 160, interval: 2.8, chainCount: 5, chainDecay: 0.65 },
       { damage: 220, interval: 2.5, chainCount: 5, chainDecay: 0.70 }
-    ]
+    ],
+    awakened: {
+      title: "Thor's Storm Sovereign",
+      desc: 'Chains to 10 targets + leaves a floating Ball Lightning orb zapping nearby foes.'
+    }
   },
 
   flamethrower: {
@@ -218,7 +246,11 @@ const WEAPON_REGISTRY = {
       { damage: 2.0, cycleInterval: 6.0, flameDuration: 2.6, range: 180 },
       { damage: 3.8, cycleInterval: 5.2, flameDuration: 3.0, range: 200 },
       { damage: 6.5, cycleInterval: 4.5, flameDuration: 3.5, range: 220 }
-    ]
+    ],
+    awakened: {
+      title: "Dragon's Abyssal Maw",
+      desc: 'Expanding 360° defensive ring of blue hellfire + lingers sticky napalm on ground for 4s.'
+    }
   },
 
   chainsaw: {
@@ -240,7 +272,11 @@ const WEAPON_REGISTRY = {
       { damage: 0.65, spinRadius: 95, rotSpeed: 14 },
       { damage: 1.2, spinRadius: 105, rotSpeed: 18 },
       { damage: 2.0, spinRadius: 120, rotSpeed: 24 }
-    ]
+    ],
+    awakened: {
+      title: 'Apex Ripper: Bloodline',
+      desc: '+30% spin radius + siphons 8% of damage into actively repairing Tower HP (up to 25 HP/s).'
+    }
   },
 
   buzz_saw: {
@@ -263,7 +299,11 @@ const WEAPON_REGISTRY = {
       { damage: 10, interval: 2.2, range: 280, sawRadius: 22 },
       { damage: 18, interval: 1.9, range: 310, sawRadius: 26 },
       { damage: 30, interval: 1.6, range: 350, sawRadius: 30 }
-    ]
+    ],
+    awakened: {
+      title: 'Infinity Gyro-Chakram',
+      desc: 'Launches dual scissoring blades applying 40% severing bleed on both forward and return paths.'
+    }
   },
 
   energy_blade: {
@@ -285,7 +325,11 @@ const WEAPON_REGISTRY = {
       { damage: 4.0, spinRadius: 60, rotSpeed: 20 },
       { damage: 7.5, spinRadius: 68, rotSpeed: 24 },
       { damage: 13.0, spinRadius: 78, rotSpeed: 30 }
-    ]
+    ],
+    awakened: {
+      title: 'Cosmic Vorpal Saber',
+      desc: 'Unleashes piercing crescent energy slash waves every 0.6s reaching 350px mid-range.'
+    }
   },
 
   graviton_hammer: {
@@ -307,7 +351,11 @@ const WEAPON_REGISTRY = {
       { damage: 45, cycleInterval: 4.3, slamRadius: 150, slowDuration: 2.0 },
       { damage: 75, cycleInterval: 3.6, slamRadius: 170, slowDuration: 2.5 },
       { damage: 120, cycleInterval: 3.0, slamRadius: 200, slowDuration: 3.0 }
-    ]
+    ],
+    awakened: {
+      title: "Titan's Tectonic Breaker",
+      desc: 'Ground slam creates a 400px traveling magma fissure shockwave launching foes with 2.5s stun.'
+    }
   },
 
   void_rift: {
@@ -329,7 +377,11 @@ const WEAPON_REGISTRY = {
       { damage: 3.5, tickInterval: 0.11, vortexRadius: 115, pullStrength: 35 },
       { damage: 6.0, tickInterval: 0.10, vortexRadius: 130, pullStrength: 50 },
       { damage: 10.0, tickInterval: 0.09, vortexRadius: 150, pullStrength: 70 }
-    ]
+    ],
+    awakened: {
+      title: 'Event Horizon Collapser',
+      desc: '2x gravitational pull force + every 4s collapses in a supermassive 6x DMG implosion.'
+    }
   },
 
   shotgun: {
@@ -355,7 +407,11 @@ const WEAPON_REGISTRY = {
       { damage: 6.5, pellets: 6, interval: 0.8 },
       { damage: 9.0, pellets: 7, interval: 0.7 },
       { damage: 13.0, pellets: 7, interval: 0.6 }
-    ]
+    ],
+    awakened: {
+      title: 'Doomsday Flak Cannon',
+      desc: 'Fires 11 heavy flechettes, applies 45px knockback, and shreds armor for +25% vulnerability.'
+    }
   },
 
   cryo_cannon: {
@@ -382,7 +438,11 @@ const WEAPON_REGISTRY = {
       { damage: 150, interval: 1.9, blastRadius: 135, slowDuration: 3.6, slowAmount: 0.70 },
       { damage: 220, interval: 1.7, blastRadius: 150, slowDuration: 4.0, slowAmount: 0.75 },
       { damage: 310, interval: 1.5, blastRadius: 170, slowDuration: 4.5, slowAmount: 0.75 }
-    ]
+    ],
+    awakened: {
+      title: 'Absolute Zero Glaciator',
+      desc: '100% total freeze immobilization for 1.8s + shattered ice shrapnel on death.'
+    }
   },
 
   orbital_mortar: {
@@ -408,7 +468,11 @@ const WEAPON_REGISTRY = {
       { damage: 560, interval: 4.5, blastRadius: 165, poolDuration: 4.2, poolDps: 150 },
       { damage: 800, interval: 4.0, blastRadius: 185, poolDuration: 4.5, poolDps: 220 },
       { damage: 1150, interval: 3.5, blastRadius: 210, poolDuration: 5.0, poolDps: 320 }
-    ]
+    ],
+    awakened: {
+      title: 'Apocalypse Meteor Battery',
+      desc: 'Fires 3 staggered orbital meteors on the 3 densest packs + 6s boiling armor-melting pools.'
+    }
   },
 
   toxic_sprayer: {
@@ -432,7 +496,11 @@ const WEAPON_REGISTRY = {
       { damage: 4.5, tickInterval: 0.18, range: 190, giantBonus: 2.8 },
       { damage: 8.0, tickInterval: 0.16, range: 210, giantBonus: 3.2 },
       { damage: 14.0, tickInterval: 0.14, range: 240, giantBonus: 3.5 }
-    ]
+    ],
+    awakened: {
+      title: 'Biohazard Chimera',
+      desc: 'Leaves dense neurotoxin cloud hanging before tower reducing enemy attack DMG by 40% + acid death pops.'
+    }
   },
 
   solar_core: {
@@ -457,7 +525,11 @@ const WEAPON_REGISTRY = {
       { damage: 7.5, tickInterval: 0.14, auraRadius: 100, flareDamage: 160, flareInterval: 2.6, flareRadius: 175 },
       { damage: 13.0, tickInterval: 0.13, auraRadius: 110, flareDamage: 270, flareInterval: 2.3, flareRadius: 200 },
       { damage: 22.0, tickInterval: 0.12, auraRadius: 125, flareDamage: 440, flareInterval: 2.0, flareRadius: 230 }
-    ]
+    ],
+    awakened: {
+      title: 'Supernova Pulsar',
+      desc: 'Rapid 1.6s solar flare cycle + screen-wide blind + 4 radiant solar laser lances.'
+    }
   },
 
   ban_gun: {
@@ -468,21 +540,25 @@ const WEAPON_REGISTRY = {
     icon: '🔨',
     basePrice: 999999999,
     maxUpgrades: 5,
-    description: 'SECRET ADMIN WEAPON: Obliterates & bans every enemy on the screen once every 60 seconds!',
+    description: 'SECRET ADMIN WEAPON: Obliterates & bans every enemy on screen! Upgrades lower cooldown from 60s down to rapid fire.',
     baseStats: {
       damage: 10000000000, // 10 Billion base damage: guaranteed one-shot on all targets
-      interval: 60.0, // 60 seconds cooldown
+      interval: 60.0, // Base cooldown: 60 seconds
       range: 3000,
       isScreenNuke: true
     },
     upgradeCosts: [10000, 50000, 250000, 1000000, 5000000],
     statUpgrades: [
-      { damage: 25000000000, interval: 60.0 },
-      { damage: 50000000000, interval: 60.0 },
-      { damage: 100000000000, interval: 60.0 },
-      { damage: 250000000000, interval: 60.0 },
-      { damage: 500000000000, interval: 60.0 }
-    ]
+      { damage: 25000000000, interval: 50.0 }, // Level 1: 50s cooldown
+      { damage: 50000000000, interval: 40.0 }, // Level 2: 40s cooldown
+      { damage: 100000000000, interval: 30.0 }, // Level 3: 30s cooldown
+      { damage: 250000000000, interval: 20.0 }, // Level 4: 20s cooldown
+      { damage: 500000000000, interval: 10.0 }  // Level 5: 10s cooldown
+    ],
+    awakened: {
+      title: 'Judgement Day: Digital Oblivion',
+      desc: 'Matrix digital erasure + double coin drops from all banned targets + 6s wave freeze peace.'
+    }
   }
 };
 
